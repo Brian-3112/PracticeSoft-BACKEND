@@ -37,6 +37,38 @@ const loginUser = async (req, res) => {
   }
 };
 
+//getttt
+const consulta = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Token no proporcionado' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await prisma.User.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    res.json(user);
+
+  } catch (error) {
+    console.error('Error en consulta:', error); // 👈 Agrega esto para debug
+    res.status(500).json({ error: "Error obteniendo perfil del usuario" });
+  }
+};
+
+
 //crear user
 const registerUser = async (req, res) => {
   try {
@@ -62,4 +94,4 @@ const registerUser = async (req, res) => {
   }
 };
 
-module.exports = { loginUser, registerUser };
+module.exports = { loginUser, consulta, registerUser };
