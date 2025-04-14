@@ -16,3 +16,9 @@ model User {
 }
 
 
+model Vehiculo {
+  id             Int    @id @default(autoincrement())
+  nombreVehiculo String
+  placa          String
+  transito       String
+}
