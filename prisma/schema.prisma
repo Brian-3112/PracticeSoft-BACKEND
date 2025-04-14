@@ -15,10 +15,10 @@ model User {
   password String
 }
 
-
 model Vehiculo {
   id             Int    @id @default(autoincrement())
   nombreVehiculo String
-  placa          String
+  placa          String @unique  
   transito       String
 }
+

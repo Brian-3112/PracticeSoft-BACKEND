@@ -15,5 +15,6 @@ CREATE TABLE `Vehiculo` (
     `placa` VARCHAR(191) NOT NULL,
     `transito` VARCHAR(191) NOT NULL,
 
+    UNIQUE INDEX `Vehiculo_placa_key`(`placa`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
