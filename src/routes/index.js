@@ -1,6 +1,7 @@
 const express = require('express');
 
 const routerUsuario  = require('./usuarioRouter');
+const routerVehiculo = require('./vehiculoRouter'); 
 
 
 
@@ -11,6 +12,7 @@ function routerApi(app){
     app.use("/api", router)
     // hace que las rutas definidas en 'usuarioRouter' estén disponibles en "/api/usuarios"
     router.use('/usuarios', routerUsuario);
+    router.use('/vehiculos', routerVehiculo);
     
 }
 
