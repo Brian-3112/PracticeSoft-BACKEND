@@ -22,3 +22,18 @@ model Vehiculo {
   transito       String
 }
 
+// creación del modelo cliente
+model Cliente {
+  id                 Int    @id @default(autoincrement())
+  nombre             String
+  identificacion     String @unique
+  direccion          String
+  celular            String
+  correo             String
+  nombreFamiliar     String
+  direccionFamiliar  String
+  telefonoFamiliar   String
+  nombrePersonal     String
+  direccionPersonal  String
+  telefonoPersonal   String
+}
