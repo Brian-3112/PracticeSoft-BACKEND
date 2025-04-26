@@ -20,6 +20,7 @@ model Vehiculo {
   nombreVehiculo String
   placa          String @unique  
   transito       String
+  description    String
 }
 
 // creación del modelo cliente

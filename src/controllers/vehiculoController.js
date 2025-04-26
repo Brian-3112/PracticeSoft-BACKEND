@@ -20,7 +20,7 @@ const consultar = async (req, res) => {
 // Crear un nuevo vehículo
 const registerVehiculo = async (req, res) => {
   try {
-    const { nombreVehiculo, placa, transito } = req.body;
+    const { nombreVehiculo, placa, transito, description } = req.body;
 
     // Verificar si ya existe un vehículo con esa placa
     const RepeatPlaca = await prisma.vehiculo.findUnique({
@@ -42,6 +42,7 @@ const registerVehiculo = async (req, res) => {
         nombreVehiculo,
         placa,
         transito,
+        description,
       },
     });
 
