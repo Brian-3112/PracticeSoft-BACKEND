@@ -14,6 +14,8 @@ CREATE TABLE `Vehiculo` (
     `nombreVehiculo` VARCHAR(191) NOT NULL,
     `placa` VARCHAR(191) NOT NULL,
     `transito` VARCHAR(191) NOT NULL,
+    `fechaSOAT` DATETIME(3) NOT NULL,
+    `fechaTecno` DATETIME(3) NOT NULL,
     `description` VARCHAR(191) NOT NULL,
 
     UNIQUE INDEX `Vehiculo_placa_key`(`placa`),

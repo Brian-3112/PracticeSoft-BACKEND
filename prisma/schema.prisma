@@ -20,6 +20,8 @@ model Vehiculo {
   nombreVehiculo String
   placa          String @unique  
   transito       String
+  fechaSOAT      DateTime
+  fechaTecno     DateTime
   description    String
 }
 
