@@ -55,8 +55,63 @@ const registerCliente = async (req, res) => {
 
 
 
+// ! Actualizar un vehiculo
+
+const actualizar = async (req, res) => {
+  try {
+
+    const { nombre, identificacion, direccion, celular, correo, nombreFamiliar, direccionFamiliar, telefonoFamiliar, 
+        nombrePersonal, direccionPersonal, telefonoPersonal } = req.body;
+
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID inválido' });
+    }
+
+    const clientes = await prisma.Cliente.findUnique({
+      where: { id: id },
+    });
+
+
+
+    if (identificacion !== clientes.identificacion) {
+      // Verificar si ya existe un cliente con la misma cedula.
+      const RepeatID = await prisma.Cliente.findUnique({
+        where: {
+            identificacion: identificacion,
+        },
+    });
+
+    if (RepeatID) {
+        return res.status(403).json({
+            message: 'Ya existe este Cliente',
+            RepeatID,
+        });
+    }
+    }
+
+
+
+    // Actualizar los valores del registro
+    const clienteActualizado = await prisma.Cliente.update({
+      where: { id: id },
+      data: {
+        nombre, identificacion, direccion, celular, correo, nombreFamiliar, direccionFamiliar, telefonoFamiliar, 
+        nombrePersonal, direccionPersonal, telefonoPersonal 
+      }
+    });
+
+
+
+    res.json({ message: 'Actualización exitosa', clienteActualizado });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar el vehiculo ' });
+  }
+}
 
 
 
 
-module.exports = { consultar, registerCliente };
+
+
+module.exports = { consultar, registerCliente, actualizar };
