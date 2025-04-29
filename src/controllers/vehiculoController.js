@@ -48,7 +48,7 @@ const registerVehiculo = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Vehículo creado", NuevoVehiculo });
+    res.status(201).json({ message: "Vehículo creado exitosamente", NuevoVehiculo });
   } catch (error) {
     console.error("Error creando el vehículo:", error);
     res.status(500).json({ error: "Error creando el vehículo" });
