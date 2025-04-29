@@ -1,5 +1,5 @@
 const express = require('express');
-const { consultar, registerVehiculo, actualizar } = require('../controllers/vehiculoController');
+const { consultar, registerVehiculo, actualizar, eliminar  } = require('../controllers/vehiculoController');
 
 
 const router = express.Router();
@@ -12,6 +12,9 @@ router.post("/", registerVehiculo);
 
 //* Uddate
 router.patch('/:id', actualizar);
+
+// Delete
+router.delete('/:id', eliminar);
 
 module.exports = router;
 

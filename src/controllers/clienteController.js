@@ -111,7 +111,37 @@ const actualizar = async (req, res) => {
 
 
 
+// Eliminar un vehículo
+const eliminar = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID inválido' });
+    }
+
+    // Verificar si el vehículo existe
+    const cliente = await prisma.Cliente.findUnique({
+      where: { id },
+    });
+
+    if (!cliente) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+
+    // Eliminar el vehículo
+    await prisma.Cliente.delete({
+      where: { id },
+    });
+
+    res.json({ message: 'Cliente eliminado correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar el Cliente:', error);
+    res.status(500).json({ message: 'Error al eliminar el Cliente' });
+  }
+};
 
 
 
-module.exports = { consultar, registerCliente, actualizar };
+
+
+module.exports = { consultar, registerCliente, actualizar, eliminar };

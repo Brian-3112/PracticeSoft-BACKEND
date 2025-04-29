@@ -116,10 +116,40 @@ const actualizar = async (req, res) => {
 
 
 
+// Eliminar un vehículo
+const eliminar = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'ID inválido' });
+    }
+
+    // Verificar si el vehículo existe
+    const vehiculo = await prisma.Vehiculo.findUnique({
+      where: { id },
+    });
+
+    if (!vehiculo) {
+      return res.status(404).json({ message: 'Vehículo no encontrado' });
+    }
+
+    // Eliminar el vehículo
+    await prisma.Vehiculo.delete({
+      where: { id },
+    });
+
+    res.json({ message: 'Vehículo eliminado correctamente' });
+  } catch (error) {
+    console.error('Error al eliminar el vehículo:', error);
+    res.status(500).json({ message: 'Error al eliminar el vehículo' });
+  }
+};
 
 
 
 
 
 
-module.exports = { consultar, registerVehiculo, actualizar };
+
+
+module.exports = { consultar, registerVehiculo, actualizar, eliminar };
