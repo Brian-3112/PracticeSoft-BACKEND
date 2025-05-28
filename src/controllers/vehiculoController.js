@@ -21,6 +21,7 @@ const consultar = async (req, res) => {
 const registerVehiculo = async (req, res) => {
   try {
     const { nombreVehiculo, placa, transito, fechaSOAT, fechaTecno, description } = req.body;
+ 
 
     // Verificar si ya existe un vehículo con esa placa
     const RepeatPlaca = await prisma.Vehiculo.findUnique({
@@ -42,7 +43,7 @@ const registerVehiculo = async (req, res) => {
         nombreVehiculo,
         placa,
         transito,
-        fechaSOAT: new Date(fechaSOAT),
+        fechaSOAT:  new Date(fechaSOAT),
         fechaTecno: new Date(fechaTecno),
         description,
       },
