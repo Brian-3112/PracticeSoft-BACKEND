@@ -10,7 +10,15 @@ const prisma = new PrismaClient();
 const consultar = async (req, res) => {
   try {
     const vehiculos = await prisma.Vehiculo.findMany();
-    res.status(200).json(vehiculos);
+
+    // Formatear fechas a 'YYYY-MM-DD'
+    const vehiculosFormateados = vehiculos.map((v) => ({
+      ...v,
+      fechaSOAT: v.fechaSOAT.toISOString().split("T")[0],
+      fechaTecno: v.fechaTecno.toISOString().split("T")[0],
+    }));
+
+    res.status(200).json(vehiculosFormateados);
   } catch (error) {
     console.error('Error al consultar la tabla Vehiculo:', error);
     res.status(500).json({ error: 'Error al consultar la tabla Vehiculo' });
