@@ -42,8 +42,8 @@ const registerVehiculo = async (req, res) => {
         nombreVehiculo,
         placa,
         transito,
-        fechaSOAT,
-        fechaTecno,
+        fechaSOAT: new Date(fechaSOAT),
+        fechaTecno: new Date(fechaTecno),
         description,
       },
     });
@@ -100,8 +100,8 @@ const actualizar = async (req, res) => {
         nombreVehiculo,
         placa,
         transito,
-        fechaSOAT,
-        fechaTecno,
+        fechaSOAT: new Date(fechaSOAT),
+        fechaTecno: new Date(fechaTecno),
         description
       }
     });
