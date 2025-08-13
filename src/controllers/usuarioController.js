@@ -63,7 +63,7 @@ const consulta = async (req, res) => {
     res.json(user);
 
   } catch (error) {
-    console.error('Error en consulta:', error); // 👈 Agrega esto para debug
+    console.error('Error en consulta:', error); 
     res.status(500).json({ error: "Error obteniendo perfil del usuario" });
   }
 };
