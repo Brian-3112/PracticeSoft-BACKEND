@@ -16,12 +16,12 @@ model User {
 }
 
 model Vehiculo {
-  id             Int    @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   nombreVehiculo String
-  placa          String @unique  
+  placa          String   @unique  
   transito       String
-  fechaSOAT      DateTime
-  fechaTecno     DateTime
+  fechaSOAT      DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
+  fechaTecno     DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
   description    String
 }
 
