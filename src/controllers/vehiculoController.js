@@ -11,15 +11,10 @@ const consultar = async (req, res) => {
   try {
     const vehiculos = await prisma.Vehiculo.findMany();
 
-    // Formatear fechas a YYYY-MM-DD
     const vehiculosFormateados = vehiculos.map((v) => ({
       ...v,
-      fechaSOAT: v.fechaSOAT instanceof Date
-        ? v.fechaSOAT.toISOString().split("T")[0]
-        : v.fechaSOAT,
-      fechaTecno: v.fechaTecno instanceof Date
-        ? v.fechaTecno.toISOString().split("T")[0]
-        : v.fechaTecno,
+      fechaSOAT: v.fechaSOAT.toISOString().split("T")[0],
+      fechaTecno: v.fechaTecno.toISOString().split("T")[0],
     }));
 
     res.status(200).json(vehiculosFormateados);
@@ -33,7 +28,7 @@ const consultar = async (req, res) => {
 const registerVehiculo = async (req, res) => {
   try {
     const { nombreVehiculo, placa, transito, fechaSOAT, fechaTecno, description } = req.body;
-
+ 
 
     // Verificar si ya existe un vehículo con esa placa
     const RepeatPlaca = await prisma.Vehiculo.findUnique({
@@ -55,20 +50,15 @@ const registerVehiculo = async (req, res) => {
         nombreVehiculo,
         placa,
         transito,
-        fechaSOAT: new Date(fechaSOAT),
+        fechaSOAT:  new Date(fechaSOAT),
         fechaTecno: new Date(fechaTecno),
         description,
       },
     });
 
-    // Formatear fechas para la respuesta
-    const VehiculoFormateado = {
-      ...NuevoVehiculo,
-      fechaSOAT: NuevoVehiculo.fechaSOAT.toISOString().split("T")[0],
-      fechaTecno: NuevoVehiculo.fechaTecno.toISOString().split("T")[0],
-    };
+   
 
-    res.status(201).json({ message: "Vehículo creado exitosamente", VehiculoFormateado });
+    res.status(201).json({ message: "Vehículo creado exitosamente", NuevoVehiculo });
   } catch (error) {
     console.error("Error creando el vehículo:", error);
     res.status(500).json({ error: "Error creando el vehículo" });
