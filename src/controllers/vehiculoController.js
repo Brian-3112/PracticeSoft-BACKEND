@@ -56,7 +56,14 @@ const registerVehiculo = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Vehículo creado exitosamente", NuevoVehiculo });
+    // Formatear fechas para la respuesta
+    const VehiculoFormateado = {
+      ...NuevoVehiculo,
+      fechaSOAT: NuevoVehiculo.fechaSOAT.toISOString().split("T")[0],
+      fechaTecno: NuevoVehiculo.fechaTecno.toISOString().split("T")[0],
+    };
+
+    res.status(201).json({ message: "Vehículo creado exitosamente", VehiculoFormateado });
   } catch (error) {
     console.error("Error creando el vehículo:", error);
     res.status(500).json({ error: "Error creando el vehículo" });
