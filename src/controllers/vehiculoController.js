@@ -11,7 +11,6 @@ const consultar = async (req, res) => {
   try {
     const vehiculos = await prisma.Vehiculo.findMany();
 
-    // Formatear fechas a 'YYYY-MM-DD'
     const vehiculosFormateados = vehiculos.map((v) => ({
       ...v,
       fechaSOAT: v.fechaSOAT.toISOString().split("T")[0],
