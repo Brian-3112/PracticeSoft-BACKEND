@@ -11,6 +11,7 @@ const consultar = async (req, res) => {
   try {
     const vehiculos = await prisma.Vehiculo.findMany();
 
+    // formateo de fechas antes de enviarlas
     const vehiculosFormateados = vehiculos.map((v) => ({
       ...v,
       fechaSOAT: v.fechaSOAT.toISOString().split("T")[0],
@@ -28,7 +29,6 @@ const consultar = async (req, res) => {
 const registerVehiculo = async (req, res) => {
   try {
     const { nombreVehiculo, placa, transito, fechaSOAT, fechaTecno, description } = req.body;
-
 
     // Verificar si ya existe un vehículo con esa placa
     const RepeatPlaca = await prisma.Vehiculo.findUnique({
@@ -65,7 +65,6 @@ const registerVehiculo = async (req, res) => {
     };
 
     res.status(201).json({ message: "Vehículo creado exitosamente", vehiculo: vehiculoFormateado });
-
   } catch (error) {
     console.error("Error creando el vehículo:", error);
     res.status(500).json({ error: "Error creando el vehículo" });
@@ -75,7 +74,6 @@ const registerVehiculo = async (req, res) => {
 
 
 // ! Actualizar un vehiculo
-
 const actualizar = async (req, res) => {
   try {
 
