@@ -28,7 +28,7 @@ const consultar = async (req, res) => {
 const registerVehiculo = async (req, res) => {
   try {
     const { nombreVehiculo, placa, transito, fechaSOAT, fechaTecno, description } = req.body;
- 
+
 
     // Verificar si ya existe un vehículo con esa placa
     const RepeatPlaca = await prisma.Vehiculo.findUnique({
@@ -44,21 +44,28 @@ const registerVehiculo = async (req, res) => {
       });
     }
 
-    // Crear el nuevo vehículo
+    // Crear un nuevo vehículo
     const NuevoVehiculo = await prisma.Vehiculo.create({
       data: {
         nombreVehiculo,
         placa,
         transito,
-        fechaSOAT:  new Date(fechaSOAT),
-        fechaTecno: new Date(fechaTecno),
+        // convertimos el string "YYYY-MM-DD" en Date (medianoche local)
+        fechaSOAT: new Date(`${fechaSOAT}T00:00:00`),
+        fechaTecno: new Date(`${fechaTecno}T00:00:00`),
         description,
       },
     });
 
-   
+    // Formatear antes de responder para que no se vea con hora en el front
+    const vehiculoFormateado = {
+      ...NuevoVehiculo,
+      fechaSOAT: NuevoVehiculo.fechaSOAT.toISOString().split("T")[0],
+      fechaTecno: NuevoVehiculo.fechaTecno.toISOString().split("T")[0],
+    };
 
-    res.status(201).json({ message: "Vehículo creado exitosamente", NuevoVehiculo });
+    res.status(201).json({ message: "Vehículo creado exitosamente", vehiculo: vehiculoFormateado });
+
   } catch (error) {
     console.error("Error creando el vehículo:", error);
     res.status(500).json({ error: "Error creando el vehículo" });
