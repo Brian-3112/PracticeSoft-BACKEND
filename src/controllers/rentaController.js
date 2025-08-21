@@ -11,7 +11,7 @@ const consultar = async (req, res) => {
         const rentas = await prisma.Renta.findMany();
 
         // formateo de fechas antes de enviarlas
-        const rentasFormateados = vehiculos.map((r) => ({
+        const rentasFormateados = rentas.map((r) => ({
             ...r,
             fechaEntrega: r.fechaEntrega.toISOString().split("T")[0],
             fechaDevolucion: r.fechaDevolucion.toISOString().split("T")[0],
