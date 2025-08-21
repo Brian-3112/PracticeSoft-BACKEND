@@ -11,7 +11,7 @@ const consultar = async (req, res) => {
         const rentas = await prisma.Renta.findMany();
 
         // formateo de fechas antes de enviarlas
-        const rentasFormateados = vehiculos.map((v) => ({
+        const rentasFormateados = vehiculos.map((r) => ({
             ...r,
             fechaEntrega: r.fechaEntrega.toISOString().split("T")[0],
             fechaDevolucion: r.fechaDevolucion.toISOString().split("T")[0],
@@ -19,7 +19,7 @@ const consultar = async (req, res) => {
         res.status(200).json(rentasFormateados);
     } catch (error) {
         console.error('Error al consultar la tabla Clientes:', error);
-        res.status(500).json({ error: 'Error al consultar la tabla Clientes' });
+        res.status(500).json({ error: 'Error al consultar la tabla rentas' });
     }
 };
 
