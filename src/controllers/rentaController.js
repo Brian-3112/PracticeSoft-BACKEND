@@ -30,9 +30,9 @@ const registerRenta = async (req, res) => {
       valorDia 
     } = req.body;
 
-    // Calcular días y total
-    const fechaInicio = new Date(fechaEntrega);
-    const fechaFin = new Date(fechaDevolucion);
+    // Calcular días y total - Convertir los strings "YYYY-MM-DD" en Date (a medianoche local)
+    const fechaInicio = new Date(`${fechaEntrega}T00:00:00`);
+    const fechaFin = new Date(`${fechaDevolucion}T00:00:00`);
 
     if (fechaFin < fechaInicio) {
       return res.status(400).json({ error: "La fecha de devolución no puede ser anterior a la de entrega" });
@@ -60,7 +60,14 @@ const registerRenta = async (req, res) => {
       }
     });
 
-    res.status(201).json({ message: "Renta creada correctamente", renta: nuevaRenta });
+    // Formatear fechas antes de responder (solo YYYY-MM-DD)
+    const rentaFormateada = {
+      ...nuevaRenta,
+      fechaEntrega: nuevaRenta.fechaEntrega.toISOString().split("T")[0],
+      fechaDevolucion: nuevaRenta.fechaDevolucion.toISOString().split("T")[0],
+    };
+
+    res.status(201).json({ message: "Renta creada correctamente", renta: rentaFormateada });
   } catch (error) {
     console.error("Error creando la renta:", error);
     res.status(500).json({ error: "Error creando la renta" });
