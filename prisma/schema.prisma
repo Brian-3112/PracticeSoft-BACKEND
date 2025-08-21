@@ -53,9 +53,9 @@ model Renta {
   id              Int       @id @default(autoincrement())
   vehiculoId      Int
   clienteId       Int
-  fechaEntrega    DateTime
+  fechaEntrega    DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
   horaEntrega     String
-  fechaDevolucion DateTime
+  fechaDevolucion DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
   horaDevolucion  String
   numeroDias      Int
   valorDia        Float
