@@ -15,6 +15,7 @@ model User {
   password String
 }
 
+// Tabla Vehiculo
 model Vehiculo {
   id             Int      @id @default(autoincrement())
   nombreVehiculo String
@@ -23,9 +24,12 @@ model Vehiculo {
   fechaSOAT      DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
   fechaTecno     DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
   description    String
+
+  // Relación inversa hacia Renta
+  rentas Renta[]
 }
 
-// creación del modelo cliente
+// Tabla Cliente
 model Cliente {
   id                 Int    @id @default(autoincrement())
   nombre             String
@@ -39,4 +43,25 @@ model Cliente {
   nombrePersonal     String
   direccionPersonal  String
   telefonoPersonal   String
+
+  // Relación inversa hacia Renta
+  rentas Renta[]
+}
+
+// Tabla Renta
+model Renta {
+  id              Int       @id @default(autoincrement())
+  vehiculoId      Int
+  clienteId       Int
+  fechaEntrega    DateTime
+  horaEntrega     String
+  fechaDevolucion DateTime
+  horaDevolucion  String
+  numeroDias      Int
+  valorDia        Float
+  valorTotal      Float
+  createdAt       DateTime  @default(now())
+
+  vehiculo   Vehiculo @relation(fields: [vehiculoId], references: [id])
+  cliente    Cliente  @relation(fields: [clienteId], references: [id])
 }

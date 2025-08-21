@@ -40,3 +40,26 @@ CREATE TABLE `Cliente` (
     UNIQUE INDEX `Cliente_identificacion_key`(`identificacion`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Renta` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `vehiculoId` INTEGER NOT NULL,
+    `clienteId` INTEGER NOT NULL,
+    `fechaEntrega` DATETIME(3) NOT NULL,
+    `horaEntrega` VARCHAR(191) NOT NULL,
+    `fechaDevolucion` DATETIME(3) NOT NULL,
+    `horaDevolucion` VARCHAR(191) NOT NULL,
+    `numeroDias` INTEGER NOT NULL,
+    `valorDia` DOUBLE NOT NULL,
+    `valorTotal` DOUBLE NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `Renta` ADD CONSTRAINT `Renta_vehiculoId_fkey` FOREIGN KEY (`vehiculoId`) REFERENCES `Vehiculo`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Renta` ADD CONSTRAINT `Renta_clienteId_fkey` FOREIGN KEY (`clienteId`) REFERENCES `Cliente`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
