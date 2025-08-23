@@ -8,7 +8,12 @@ const prisma = new PrismaClient();
 // Consultar todos los Clientes
 const consultar = async (req, res) => {
     try {
-        const rentas = await prisma.Renta.findMany();
+        const rentas = await prisma.Renta.findMany({
+            include: {
+                cliente: true,   
+                vehiculo: true,  
+            },
+        });
 
         // formateo de fechas antes de enviarlas
         const rentasFormateados = rentas.map((r) => ({
