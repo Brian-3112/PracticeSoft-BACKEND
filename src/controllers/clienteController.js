@@ -46,7 +46,7 @@ const registerCliente = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Cliente creado", NuevoCiente });
+    res.status(201).json({ message: "Cliente creado", cliente: NuevoCiente});
   } catch (error) {
     console.error("Error creando el Cliente:", error);
     res.status(500).json({ error: "Error creando el Cliente" });
