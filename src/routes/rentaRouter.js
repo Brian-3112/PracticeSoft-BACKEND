@@ -1,5 +1,5 @@
 const express = require('express');
-const { consultar, registerRenta  } = require('../controllers/rentaController');
+const { consultar, registerRenta, descargarContrato  } = require('../controllers/rentaController');
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ router.post("/", registerRenta);
 // router.delete('/:id', eliminar);
 
 
-// //get contrato
-// router.get("/:id/contrato'", );
+//get contrato
+router.get("/:id/contrato'", descargarContrato);
 
 module.exports = router;

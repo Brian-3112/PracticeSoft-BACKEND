@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const PDFDocument = require('pdfkit');
 
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
@@ -86,9 +87,28 @@ const registerRenta = async (req, res) => {
     }
 };
 
+const descargarContrato = async (req, res) => {
 
 
 
 
 
-module.exports = { consultar, registerRenta };
+
+
+
+
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+module.exports = { consultar, registerRenta, descargarContrato };
