@@ -15,4 +15,8 @@ router.post("/", registerRenta);
 // // Delete
 // router.delete('/:id', eliminar);
 
+
+// //get contrato
+// router.get("/:id/contrato'", );
+
 module.exports = router;
