@@ -87,25 +87,6 @@ const registerRenta = async (req, res) => {
     }
 };
 
-const descargarContrato = async (req, res) => {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}
-
 
 
 
