@@ -1,5 +1,5 @@
 const express = require('express');
-const { consultar, registerRenta   } = require('../controllers/rentaController');
+const { consultar, registerRenta, generarComprobante    } = require('../controllers/rentaController');
 
 const router = express.Router();
 
@@ -14,6 +14,9 @@ router.post("/", registerRenta);
 
 // // Delete
 // router.delete('/:id', eliminar);
+
+// Descargar comprobante PDF
+router.get("/:id/comprobante", generarComprobante);
 
 
 
