@@ -8,8 +8,10 @@ const prisma = new PrismaClient();
 // Consultar todos los Clientes
 const consultar = async (req, res) => {
   try {
+
     const clientes = await prisma.Cliente.findMany();
     res.status(200).json(clientes);
+
   } catch (error) {
     console.error('Error al consultar la tabla Clientes:', error);
     res.status(500).json({ error: 'Error al consultar la tabla Clientes' });
@@ -46,7 +48,7 @@ const registerCliente = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Cliente creado exitosamente", cliente: NuevoCiente});
+    res.status(201).json({ message: "Cliente creado exitosamente", cliente: NuevoCiente });
   } catch (error) {
     console.error("Error creando el Cliente:", error);
     res.status(500).json({ error: "Error creando el Cliente" });
@@ -91,7 +93,6 @@ const actualizar = async (req, res) => {
     }
 
 
-
     // Actualizar los valores del registro
     const clienteActualizado = await prisma.Cliente.update({
       where: { id: id },
@@ -119,7 +120,7 @@ const eliminar = async (req, res) => {
       return res.status(400).json({ message: 'ID inválido' });
     }
 
-    // Verificar si el vehículo existe
+    // Verificar si el cliente existe
     const cliente = await prisma.Cliente.findUnique({
       where: { id },
     });

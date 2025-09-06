@@ -1,9 +1,6 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-
-
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+
 
 
 // Consultar todos los vehículos
@@ -24,6 +21,7 @@ const consultar = async (req, res) => {
     res.status(500).json({ error: 'Error al consultar la tabla Vehiculo' });
   }
 };
+
 
 // Crear un nuevo vehículo
 const registerVehiculo = async (req, res) => {
@@ -106,8 +104,6 @@ const actualizar = async (req, res) => {
       }
     }
 
-
-
     // Actualizar los valores del registro
     const vehiculoActualizado = await prisma.Vehiculo.update({
       where: { id: id },
@@ -120,7 +116,6 @@ const actualizar = async (req, res) => {
         description
       }
     });
-
 
 
     res.json({ message: 'Actualización exitosa', vehiculoActualizado });
@@ -159,8 +154,6 @@ const eliminar = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar el vehículo' });
   }
 };
-
-
 
 
 
