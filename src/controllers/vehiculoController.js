@@ -143,6 +143,18 @@ const eliminar = async (req, res) => {
       return res.status(404).json({ message: 'Vehículo no encontrado' });
     }
 
+     // verificar si el vehículo está en uso
+     const vehiculoEnUso = await prisma.renta.findFirst({
+      where: {
+        vehiculoId: Number(id)
+      }
+    });
+
+    if (vehiculoEnUso) {
+      return res.status(403).json({ message: 'El vehiculo tiene rentas asociadas' });
+    }
+
+
     // Eliminar el vehículo
     await prisma.Vehiculo.delete({
       where: { id },
