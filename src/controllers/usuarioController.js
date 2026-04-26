@@ -64,6 +64,9 @@ const consulta = async (req, res) => {
 
   } catch (error) {
     console.error('Error en consulta:', error);
+    if (error?.name === "JsonWebTokenError" || error?.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Token inválido o expirado" });
+    }
     res.status(500).json({ error: "Error obteniendo perfil del usuario" });
   }
 };

@@ -3,9 +3,318 @@
    const PDFDocument = require("pdfkit");
    const fs = require("fs");
    const path = require("path");
+  const AdmZip = require("adm-zip");
 
    const { PrismaClient } = require("@prisma/client");
    const prisma = new PrismaClient();
+
+  const formatDate = (value) => new Date(value).toISOString().split("T")[0];
+const formatDateDMY = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+};
+const toTitleCaseName = (value) =>
+    String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+  const formatMoney = (value) =>
+      Number(value ?? 0).toLocaleString("es-CO", {
+          style: "currency",
+          currency: "COP",
+          minimumFractionDigits: 0,
+      });
+  const escapeXml = (value) =>
+      String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+
+  const buildTextRun = (text) => `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+const buildStyledTextRun = (text, options = {}) => {
+    const { size = 18, color = null, bold = false } = options;
+    const boldXml = bold ? "<w:b/><w:bCs/>" : "";
+    const colorXml = color ? `<w:color w:val="${color}"/>` : "";
+    return `<w:r><w:rPr>${boldXml}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/>${colorXml}<w:lang w:val="es-ES"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+};
+
+  const fillCellAfterHeader = (xml, header, value) => {
+      const safeHeader = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(
+          `(<w:t[^>]*>${safeHeader}<\\/w:t>[\\s\\S]*?<\\/w:tc><w:tc[\\s\\S]*?<w:p[^>]*>)([\\s\\S]*?)(<\\/w:p>)`
+      );
+      return xml.replace(regex, `$1${buildTextRun(value)}$3`);
+  };
+
+const fillCellAfterHeaderOccurrence = (xml, header, value, occurrence = 1, runBuilder = buildTextRun) => {
+    const safeHeader = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(
+        `(<w:t[^>]*>${safeHeader}<\\/w:t>[\\s\\S]*?<\\/w:tc><w:tc[\\s\\S]*?<w:p[^>]*>)([\\s\\S]*?)(<\\/w:p>)`,
+        "g"
+    );
+    let count = 0;
+    return xml.replace(regex, (match, p1, _p2, p3) => {
+        count += 1;
+        if (count === occurrence) {
+            return `${p1}${runBuilder(value)}${p3}`;
+        }
+        return match;
+    });
+};
+
+const fillCellAfterHeaderOccurrenceWithAlignment = (
+    xml,
+    header,
+    value,
+    occurrence = 1,
+    align = "left",
+    runBuilder = buildTextRun
+) => {
+    const safeHeader = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(
+        `(<w:t[^>]*>${safeHeader}<\\/w:t>[\\s\\S]*?<\\/w:tc><w:tc[\\s\\S]*?<w:p[^>]*>)([\\s\\S]*?)(<\\/w:p>)`,
+        "g"
+    );
+    let count = 0;
+    return xml.replace(regex, (match, p1, _p2, p3) => {
+        count += 1;
+        if (count === occurrence) {
+            return `${p1}<w:pPr><w:jc w:val="${align}"/></w:pPr>${runBuilder(value)}${p3}`;
+        }
+        return match;
+    });
+};
+
+const fillCellAfterHeaderWithAlignment = (xml, header, value, align = "left") => {
+    const safeHeader = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(
+        `(<w:t[^>]*>${safeHeader}<\\/w:t>[\\s\\S]*?<\\/w:tc><w:tc[\\s\\S]*?<w:p[^>]*>)([\\s\\S]*?)(<\\/w:p>)`
+    );
+    return xml.replace(
+        regex,
+        `$1<w:pPr><w:jc w:val="${align}"/></w:pPr>${buildTextRun(value)}$3`
+    );
+};
+
+const formatHourAmPm = (value) => {
+    if (!value) return "";
+    const raw = String(value).trim();
+
+    let hours = null;
+    let minutes = null;
+
+    if (/^\d{4}$/.test(raw)) {
+        hours = Number(raw.slice(0, 2));
+        minutes = Number(raw.slice(2, 4));
+    } else if (/^\d{1,2}:\d{2}$/.test(raw)) {
+        const [h, m] = raw.split(":");
+        hours = Number(h);
+        minutes = Number(m);
+    } else if (/^\d{1,2}:\d{2}:\d{2}$/.test(raw)) {
+        const [h, m] = raw.split(":");
+        hours = Number(h);
+        minutes = Number(m);
+    } else {
+        return raw;
+    }
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return raw;
+    }
+
+    const period = hours >= 12 ? "pm" : "am";
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+};
+
+const fillMontoTotalEnRojo = (xml, totalText) => {
+    const marker = "El arrendatario se compromete a pagar al arrendador la cantidad de ";
+    const markerIndex = xml.indexOf(marker);
+    if (markerIndex === -1) return xml;
+
+    const amountRun = buildStyledTextRun(`${totalText} `, { size: 18, color: "FF0000", bold: true });
+    const beforeMarker = xml.slice(0, markerIndex);
+    const fromMarker = xml.slice(markerIndex);
+    const updatedFromMarker = fromMarker.replace(
+        /<w:r\b[\s\S]*?<w:t xml:space="preserve">\s{6}<\/w:t><\/w:r>/,
+        amountRun
+    );
+
+    return beforeMarker + updatedFromMarker;
+};
+
+const buildParagraph = (text, align = "left", size = 18) =>
+    `<w:p><w:pPr><w:jc w:val="${align}"/></w:pPr>${buildStyledTextRun(text, { size })}</w:p>`;
+
+const fillCelularCorreoSection = (xml, cliente = {}) => {
+    const contactoRegex =
+        /<w:tr\b[\s\S]*?<w:t>CELULAR:<\/w:t>[\s\S]*?<w:t>CORREO:<\/w:t>[\s\S]*?<\/w:tr><w:tr\b[\s\S]*?<\/w:tr>/;
+
+    return xml.replace(contactoRegex, (block) => {
+        let updated = block.replace(/<w:t>CORREO:<\/w:t>/, "<w:t>CORREO ELECTRONICO:<\/w:t>");
+
+        const secondRowStart = updated.lastIndexOf("<w:tr");
+        if (secondRowStart === -1) return updated;
+
+        const firstPart = updated.slice(0, secondRowStart);
+        let secondRow = updated.slice(secondRowStart);
+
+        let paragraphIndex = 0;
+        secondRow = secondRow.replace(/<w:p\b[\s\S]*?<\/w:p>/g, (paragraph) => {
+            paragraphIndex += 1;
+            if (paragraphIndex === 1) {
+                return buildParagraph(cliente.celular || "", "center", 18);
+            }
+            if (paragraphIndex === 2) {
+                return buildParagraph(cliente.correo || "", "center", 18);
+            }
+            return paragraph;
+        });
+
+        return firstPart + secondRow;
+    });
+};
+
+const fillDireccionSection = (xml, cliente = {}) => {
+    const direccionRegex =
+        /<w:tr\b[\s\S]*?<w:t>DIRECCION<\/w:t>[\s\S]*?<\/w:tr><w:tr\b[\s\S]*?<\/w:tr>/;
+
+    return xml.replace(direccionRegex, (block) => {
+        const secondRowStart = block.lastIndexOf("<w:tr");
+        if (secondRowStart === -1) return block;
+
+        const firstPart = block.slice(0, secondRowStart);
+        let secondRow = block.slice(secondRowStart);
+
+        let paragraphIndex = 0;
+        secondRow = secondRow.replace(/<w:p\b[\s\S]*?<\/w:p>/g, (paragraph) => {
+            paragraphIndex += 1;
+            if (paragraphIndex === 1) {
+                return buildParagraph(cliente.direccion || "", "center", 18);
+            }
+            return paragraph;
+        });
+
+        return firstPart + secondRow;
+    });
+};
+
+  const fillContratoTemplate = (templatePath, renta) => {
+      const zip = new AdmZip(templatePath);
+      const entry = zip.getEntry("word/document.xml");
+      if (!entry) {
+          throw new Error("No se encontró word/document.xml en la plantilla");
+      }
+
+      let xml = zip.readAsText(entry);
+      const cliente = renta.cliente || {};
+      const vehiculo = renta.vehiculo || {};
+
+      // Placeholders visibles en la portada del contrato.
+      xml = xml.replace(
+          /<w:t xml:space="preserve">----------------\s*<\/w:t>/,
+          `<w:t xml:space="preserve">${escapeXml(toTitleCaseName(cliente.nombre || ""))} </w:t>`
+      );
+      xml = xml.replace(
+          /<w:t xml:space="preserve">\s*-------------<\/w:t>/,
+          `<w:t xml:space="preserve"> ${escapeXml(cliente.identificacion || "")}</w:t>`
+      );
+      xml = xml.replace(/identificación con cédula/gi, "identificado con cedula");
+      xml = xml.replace(/identificacion con cedula/gi, "identificado con cedula");
+
+      // Campos de tablas comunes en esta plantilla.
+      xml = fillDireccionSection(xml, cliente);
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
+          xml,
+          "APARTAMENTO:",
+          "UNIDAD RESIDENCIAL O BARRIO:",
+          1,
+          "center",
+          (text) => buildStyledTextRun(text, { size: 18, bold: true })
+      );
+      xml = fillCelularCorreoSection(xml, cliente);
+      xml = fillCellAfterHeaderOccurrence(
+          xml,
+          "VEHICULO",
+          vehiculo.nombreVehiculo || "",
+          1,
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderOccurrence(
+          xml,
+          "PLACAS",
+          vehiculo.placa || "",
+          1,
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeader(xml, "TRÁNSITO", vehiculo.transito || "");
+      xml = fillCellAfterHeaderOccurrence(
+          xml,
+          "FECHA ENTREGA",
+          formatDateDMY(renta.fechaEntrega),
+          1,
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderOccurrence(
+          xml,
+          "FECHA DEVOLUCION",
+          formatDateDMY(renta.fechaDevolucion),
+          1,
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderOccurrence(
+          xml,
+          "FECHE DEVOLUCION",
+          formatDateDMY(renta.fechaDevolucion),
+          1,
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
+          xml,
+          "HORA:",
+          formatHourAmPm(renta.horaEntrega),
+          1,
+          "center",
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
+          xml,
+          "HORA:",
+          formatHourAmPm(renta.horaDevolucion),
+          2,
+          "center",
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderWithAlignment(xml, "No. DIAS", String(renta.numeroDias || 0), "center");
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
+          xml,
+          "VALOR DIA",
+          formatMoney(renta.valorDia),
+          1,
+          "center",
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillCellAfterHeaderOccurrence(
+          xml,
+          "FORMA DE PAGO",
+          "Efectivo/Transferencia",
+          1,
+          (text) => buildStyledTextRun(text, { size: 18 })
+      );
+      xml = fillMontoTotalEnRojo(xml, formatMoney(renta.valorTotal));
+
+      zip.updateFile("word/document.xml", Buffer.from(xml, "utf8"));
+      return zip.toBuffer();
+  };
 
 
    // Consultar todas las Rentas
@@ -78,11 +387,29 @@
             // Formatear fechas antes de responder (solo YYYY-MM-DD)
             const rentaFormateada = {
                 ...nuevaRenta,
-                fechaEntrega: nuevaRenta.fechaEntrega.toISOString().split("T")[0],
-                fechaDevolucion: nuevaRenta.fechaDevolucion.toISOString().split("T")[0],
+                fechaEntrega: formatDate(nuevaRenta.fechaEntrega),
+                fechaDevolucion: formatDate(nuevaRenta.fechaDevolucion),
             };
+            const downloadDocx = req.query.formato === "docx";
+            if (!downloadDocx) {
+                return res.status(201).json({ message: "Renta creada correctamente", renta: rentaFormateada });
+            }
 
-            res.status(201).json({ message: "Renta creada correctamente", renta: rentaFormateada });
+            const templatePath = path.join(__dirname, "..", "assets", "contrato-template.docx");
+            if (!fs.existsSync(templatePath)) {
+                return res.status(500).json({ error: "No se encontró la plantilla del contrato" });
+            }
+
+            const docxBuffer = fillContratoTemplate(templatePath, nuevaRenta);
+            res.setHeader(
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            );
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename=contrato-renta-${nuevaRenta.id}.docx`
+            );
+            return res.status(201).send(docxBuffer);
         } catch (error) {
             console.error("Error creando la renta:", error);
             res.status(500).json({ error: "Error creando la renta" });
@@ -663,4 +990,37 @@ const generarComprobante = async (req, res) => {
 
 
 
-    module.exports = { consultar, registerRenta, generarComprobante };
+const descargarContratoDocx = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const renta = await prisma.renta.findUnique({
+            where: { id: parseInt(id) },
+            include: { cliente: true, vehiculo: true },
+        });
+
+        if (!renta) {
+            return res.status(404).json({ error: "Renta no encontrada" });
+        }
+
+        const templatePath = path.join(__dirname, "..", "assets", "contrato-template.docx");
+        if (!fs.existsSync(templatePath)) {
+            return res.status(500).json({ error: "No se encontró la plantilla del contrato" });
+        }
+
+        const docxBuffer = fillContratoTemplate(templatePath, renta);
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=contrato-renta-${renta.id}.docx`
+        );
+        return res.status(200).send(docxBuffer);
+    } catch (error) {
+        console.error("Error descargando contrato DOCX:", error);
+        return res.status(500).json({ error: "Error descargando contrato DOCX" });
+    }
+};
+
+    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx };
