@@ -8,13 +8,54 @@
    const { PrismaClient } = require("@prisma/client");
    const prisma = new PrismaClient();
 
-  const formatDate = (value) => new Date(value).toISOString().split("T")[0];
+const parseDateOnly = (value) => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+    }
+
+    const raw = String(value ?? "").trim();
+    if (!raw) return null;
+
+    let year;
+    let month;
+    let day;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        [year, month, day] = raw.split("-").map(Number);
+    } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+        [day, month, year] = raw.split("/").map(Number);
+    } else {
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return null;
+        return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+    }
+
+    const utcDate = new Date(Date.UTC(year, month - 1, day));
+    if (
+        utcDate.getUTCFullYear() !== year ||
+        utcDate.getUTCMonth() !== month - 1 ||
+        utcDate.getUTCDate() !== day
+    ) {
+        return null;
+    }
+    return utcDate;
+};
+
+const formatDate = (value) => {
+    const date = parseDateOnly(value);
+    if (!date) return "";
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
 const formatDateDMY = (value) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
+    const date = parseDateOnly(value);
+    if (!date) return "";
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const year = date.getUTCFullYear();
     return `${day}-${month}-${year}`;
 };
 const toTitleCaseName = (value) =>
@@ -208,7 +249,29 @@ const fillDireccionSection = (xml, cliente = {}) => {
     });
 };
 
-  const fillContratoTemplate = (templatePath, renta) => {
+const fillReferenceSection = (xml, cliente = {}) => {
+    const appendValueAfterRegexOccurrence = (inputXml, regex, occurrence, value, size = 18) => {
+        let count = 0;
+        return inputXml.replace(regex, (match) => {
+            count += 1;
+            if (count === occurrence) {
+                return `${match}${buildStyledTextRun(` ${value || ""}`, { size })}`;
+            }
+            return match;
+        });
+    };
+
+    let updated = xml;
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre<\/w:t>)/g, 1, cliente.nombreFamiliar);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre:<\/w:t>)/g, 1, cliente.nombrePersonal);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n:\s*<\/w:t>)/g, 1, cliente.direccionFamiliar);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n:\s*<\/w:t>)/g, 2, cliente.direccionPersonal);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono:\s*<\/w:t>)/g, 1, cliente.telefonoFamiliar);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono:\s*<\/w:t>)/g, 2, cliente.telefonoPersonal);
+
+    return updated;
+};
+const fillContratoTemplate = (templatePath, renta) => {
       const zip = new AdmZip(templatePath);
       const entry = zip.getEntry("word/document.xml");
       if (!entry) {
@@ -220,9 +283,14 @@ const fillDireccionSection = (xml, cliente = {}) => {
       const vehiculo = renta.vehiculo || {};
 
       // Placeholders visibles en la portada del contrato.
+      const nombreArrendatario = toTitleCaseName(cliente.nombre || "");
+      xml = xml.replace(
+          /(<w:t[^>]*>)-{6,}(\s+identificado)/i,
+          `$1${escapeXml(nombreArrendatario)}$2`
+      );
       xml = xml.replace(
           /<w:t xml:space="preserve">----------------\s*<\/w:t>/,
-          `<w:t xml:space="preserve">${escapeXml(toTitleCaseName(cliente.nombre || ""))} </w:t>`
+          `<w:t xml:space="preserve">${escapeXml(nombreArrendatario)} </w:t>`
       );
       xml = xml.replace(
           /<w:t xml:space="preserve">\s*-------------<\/w:t>/,
@@ -233,6 +301,7 @@ const fillDireccionSection = (xml, cliente = {}) => {
 
       // Campos de tablas comunes en esta plantilla.
       xml = fillDireccionSection(xml, cliente);
+      xml = fillReferenceSection(xml, cliente);
       xml = fillCellAfterHeaderOccurrenceWithAlignment(
           xml,
           "APARTAMENTO:",
@@ -303,13 +372,32 @@ const fillDireccionSection = (xml, cliente = {}) => {
           "center",
           (text) => buildStyledTextRun(text, { size: 18 })
       );
-      xml = fillCellAfterHeaderOccurrence(
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
           xml,
           "FORMA DE PAGO",
-          "Efectivo/Transferencia",
+          "Efectivo - Transferencia",
           1,
+          "center",
           (text) => buildStyledTextRun(text, { size: 18 })
       );
+      const placaTmpMarker = "__PLACA_TMP__";
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
+          xml,
+          "OTROS",
+          placaTmpMarker,
+          1,
+          "center",
+          (text) => buildStyledTextRun(text, { size: 16 })
+      );
+      xml = fillCellAfterHeaderOccurrenceWithAlignment(
+          xml,
+          placaTmpMarker,
+          vehiculo.placa || "",
+          1,
+          "center",
+          (text) => buildStyledTextRun(text, { size: 16 })
+      );
+      xml = xml.replace(new RegExp(placaTmpMarker, "g"), "X");
       xml = fillMontoTotalEnRojo(xml, formatMoney(renta.valorTotal));
 
       zip.updateFile("word/document.xml", Buffer.from(xml, "utf8"));
@@ -330,8 +418,8 @@ const fillDireccionSection = (xml, cliente = {}) => {
             // formateo de fechas antes de enviarlas
             const rentasFormateados = rentas.map((r) => ({
                 ...r,
-                fechaEntrega: r.fechaEntrega.toISOString().split("T")[0],
-                fechaDevolucion: r.fechaDevolucion.toISOString().split("T")[0],
+                fechaEntrega: formatDate(r.fechaEntrega),
+                fechaDevolucion: formatDate(r.fechaDevolucion),
             }));
             res.status(200).json(rentasFormateados);
         } catch (error) {
@@ -355,8 +443,11 @@ const fillDireccionSection = (xml, cliente = {}) => {
             } = req.body;
 
             // Calcular días y total - Convertir los strings "YYYY-MM-DD" en Date (a medianoche local)
-            const fechaInicio = new Date(`${fechaEntrega}T00:00:00`);
-            const fechaFin = new Date(`${fechaDevolucion}T00:00:00`);
+            const fechaInicio = parseDateOnly(fechaEntrega);
+            const fechaFin = parseDateOnly(fechaDevolucion);
+            if (!fechaInicio || !fechaFin) {
+                return res.status(400).json({ error: "Formato de fecha inválido" });
+            }
 
             if (fechaFin < fechaInicio) {
                 return res.status(400).json({ error: "La fecha de devolución no puede ser anterior a la de entrega" });
@@ -453,7 +544,7 @@ const generarComprobante = async (req, res) => {
     const cliente  = renta.cliente;
     const vehiculo = renta.vehiculo;
 
-    const fmtFecha = (f) => new Date(f).toLocaleDateString("es-CO");
+    const fmtFecha = (f) => formatDateDMY(f);
     const fmtMoney = (v) =>
       Number(v).toLocaleString("es-CO", {
         style: "currency", currency: "COP", minimumFractionDigits: 0,
@@ -536,7 +627,7 @@ const generarComprobante = async (req, res) => {
     doc
       .font("Helvetica-Bold").fontSize(7.5)
       .text("ARRENDATARIO: ", L, y, { continued: true })
-      .font("Helvetica")
+      .font("Helvetica").fontSize(7.5)
       .text(
         `${cliente.nombre ?? "------------------------------"}   identificado con cedula   ${cliente.identificacion ?? "-------------"}`,
         { lineBreak: false }
@@ -571,12 +662,13 @@ const generarComprobante = async (req, res) => {
 
     // ── Referencias familiar / personal ───────────────────────
     const halfW = CW / 2;
+    const refPersonalX = L + halfW - 26;
     doc
       .font("Helvetica-Bold").fontSize(7.5)
       .text("REFERENCIA FAMILIAR:", L, y);
     doc
       .font("Helvetica-Bold").fontSize(7.5)
-      .text("REFERENCIA PERSONAL:", L + halfW, y);
+      .text("REFERENCIA PERSONAL:", refPersonalX, y);
     y += 10;
 
     const refRows = [
@@ -593,7 +685,7 @@ const generarComprobante = async (req, res) => {
         .text("  " + (izq ?? ""), { lineBreak: false });
       doc
         .font("Helvetica-Bold").fontSize(7.2)
-        .text(label, L + halfW, y, { continued: true })
+        .text(label, refPersonalX, y, { continued: true })
         .font("Helvetica")
         .text("  " + (der ?? ""), { lineBreak: false });
       y += 9;
@@ -689,7 +781,7 @@ const generarComprobante = async (req, res) => {
     cellText(fmtMoney(renta.valorDia),    L,                   y + PH, pc[0]);
     cellText("",                           L + pc[0],           y + PH, pc[1]);
     cellText(String(renta.numeroDias),    L + pc[0] + pc[1],   y + PH, pc[2]);
-    cellText("EFECTIVO / TRANSFERENCIA",  L + pc[0]+pc[1]+pc[2], y + PH, pc[3]);
+    cellText("Efectivo - Transferencia",  L + pc[0]+pc[1]+pc[2], y + PH, pc[3], { align: "center" });
 
     y += PH * 2 + 7;
 
@@ -860,6 +952,7 @@ const generarComprobante = async (req, res) => {
     // ── Tabla de inventario (4 grupos item/X) ─────────────────
     // Cada grupo: columna item (70pt) + columna X (20pt) × 4 = 360pt total
     // Centrada en la página
+    const placaInventario = vehiculo?.placa ? `No. PLACAS ${vehiculo.placa}` : "No. PLACAS";
     const invItems = [
       ["LLANTAS",       "BLOQUEO",    "REPUESTO",  "MATRICULA"],
       ["LUCES",         "TAPETES",    "PALANCA",   ""],
@@ -867,7 +960,7 @@ const generarComprobante = async (req, res) => {
       ["EXPLORADORA",   "CAJA CD",    "BOTIQUIN",  ""],
       ["ANTENA",        "AIRE ACON",  "TACOS",     "CDA"],
       ["ESPEJOS",       "CINTURONES", "PAÑO",      ""],
-      ["ESPEJOS ELEC.", "GATO",       "BICELES",   "No. PLACAS"],
+      ["ESPEJOS ELEC.", "GATO",       "BICELES",   placaInventario],
       ["ALARMA",        "CRUCETA",    "OTROS",     ""],
     ];
 
@@ -1024,3 +1117,8 @@ const descargarContratoDocx = async (req, res) => {
 };
 
     module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx };
+
+
+
+
+
