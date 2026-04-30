@@ -687,7 +687,7 @@ const generarComprobante = async (req, res) => {
         .font("Helvetica-Bold").fontSize(7.2)
         .text(label, refPersonalX, y, { continued: true })
         .font("Helvetica")
-        .text("  " + (der ?? ""), { lineBreak: false });
+        .text((der ?? ""), { lineBreak: false });
       y += 9;
     });
     y += 7;
