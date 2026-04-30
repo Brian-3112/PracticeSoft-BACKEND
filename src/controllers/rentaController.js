@@ -250,28 +250,42 @@ const fillDireccionSection = (xml, cliente = {}) => {
 };
 
 const fillReferenceSection = (xml, cliente = {}) => {
-    const appendValueAfterRegexOccurrence = (inputXml, regex, occurrence, value, size = 18) => {
-        let count = 0;
-        return inputXml.replace(regex, (match) => {
-            count += 1;
-            if (count === occurrence) {
-                return `${match}${buildStyledTextRun(` ${value || ""}`, { size })}`;
-            }
-            return match;
-        });
+    const insertValueAtParagraphEnd = (paragraphXml, value, size = 18) => {
+        if (!value) return paragraphXml;
+        return paragraphXml.replace(/<\/w:p>$/, `${buildStyledTextRun(` ${value}`, { size })}<\/w:p>`);
     };
 
-    let updated = xml;
-    // Algunas plantillas traen "Nombre" con o sin sufijo (por ejemplo "Nombre referencia:").
-    // Por eso llenamos por ocurrencia (1 = familiar, 2 = personal) usando un patrón flexible.
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre[^<]*:\s*<\/w:t>)/g, 1, cliente.nombreFamiliar);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre[^<]*:\s*<\/w:t>)/g, 2, cliente.nombrePersonal);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n[^<]*:\s*<\/w:t>)/g, 1, cliente.direccionFamiliar);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n[^<]*:\s*<\/w:t>)/g, 2, cliente.direccionPersonal);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono[^<]*:\s*<\/w:t>)/g, 1, cliente.telefonoFamiliar);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono[^<]*:\s*<\/w:t>)/g, 2, cliente.telefonoPersonal);
+    const values = [
+        cliente.nombreFamiliar || "",
+        cliente.nombrePersonal || "",
+        cliente.direccionFamiliar || "",
+        cliente.direccionPersonal || "",
+        cliente.telefonoFamiliar || "",
+        cliente.telefonoPersonal || "",
+    ];
 
-    return updated;
+    const markerIndex = xml.indexOf("REFERENCIA FAMILIAR:");
+    if (markerIndex === -1) return xml;
+
+    const tableStart = xml.indexOf("<w:tbl", markerIndex);
+    if (tableStart === -1) return xml;
+
+    const tableEnd = xml.indexOf("</w:tbl>", tableStart);
+    if (tableEnd === -1) return xml;
+
+    const tableXml = xml.slice(tableStart, tableEnd + 8);
+    let paragraphCount = 0;
+
+    const updatedTable = tableXml.replace(/<w:p\b[\s\S]*?<\/w:p>/g, (paragraph) => {
+        const hasLabel = /<w:t[^>]*>\s*(Nombre|Direcci[^<]*n|Tel[^<]*fono)\s*<\/w:t>/i.test(paragraph);
+        if (!hasLabel) return paragraph;
+
+        const value = values[paragraphCount] || "";
+        paragraphCount += 1;
+        return insertValueAtParagraphEnd(paragraph, value, 18);
+    });
+
+    return xml.slice(0, tableStart) + updatedTable + xml.slice(tableEnd + 8);
 };
 const fillContratoTemplate = (templatePath, renta) => {
       const zip = new AdmZip(templatePath);
