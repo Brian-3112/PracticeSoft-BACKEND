@@ -662,7 +662,7 @@ const generarComprobante = async (req, res) => {
 
     // ── Referencias familiar / personal ───────────────────────
     const halfW = CW / 2;
-    const refPersonalX = L + halfW - 26;
+    const refPersonalX = L + halfW - 55;
     doc
       .font("Helvetica-Bold").fontSize(7.5)
       .text("REFERENCIA FAMILIAR:", L, y);
