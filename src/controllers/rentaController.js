@@ -262,12 +262,14 @@ const fillReferenceSection = (xml, cliente = {}) => {
     };
 
     let updated = xml;
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre<\/w:t>)/g, 1, cliente.nombreFamiliar);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre:<\/w:t>)/g, 1, cliente.nombrePersonal);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n:\s*<\/w:t>)/g, 1, cliente.direccionFamiliar);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n:\s*<\/w:t>)/g, 2, cliente.direccionPersonal);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono:\s*<\/w:t>)/g, 1, cliente.telefonoFamiliar);
-    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono:\s*<\/w:t>)/g, 2, cliente.telefonoPersonal);
+    // Algunas plantillas traen "Nombre" con o sin sufijo (por ejemplo "Nombre referencia:").
+    // Por eso llenamos por ocurrencia (1 = familiar, 2 = personal) usando un patrón flexible.
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre[^<]*:\s*<\/w:t>)/g, 1, cliente.nombreFamiliar);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Nombre[^<]*:\s*<\/w:t>)/g, 2, cliente.nombrePersonal);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n[^<]*:\s*<\/w:t>)/g, 1, cliente.direccionFamiliar);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Direcci[^<]*n[^<]*:\s*<\/w:t>)/g, 2, cliente.direccionPersonal);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono[^<]*:\s*<\/w:t>)/g, 1, cliente.telefonoFamiliar);
+    updated = appendValueAfterRegexOccurrence(updated, /(<w:t[^>]*>Tel[^<]*fono[^<]*:\s*<\/w:t>)/g, 2, cliente.telefonoPersonal);
 
     return updated;
 };
