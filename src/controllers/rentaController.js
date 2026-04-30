@@ -662,7 +662,7 @@ const generarComprobante = async (req, res) => {
 
     // ── Referencias familiar / personal ───────────────────────
     const halfW = CW / 2;
-    const refPersonalX = L + halfW - 26;
+    const refPersonalX = L + halfW - 95;
     doc
       .font("Helvetica-Bold").fontSize(7.5)
       .text("REFERENCIA FAMILIAR:", L, y);
@@ -687,7 +687,7 @@ const generarComprobante = async (req, res) => {
         .font("Helvetica-Bold").fontSize(7.2)
         .text(label, refPersonalX, y, { continued: true })
         .font("Helvetica")
-        .text("  " + (der ?? ""), { lineBreak: false });
+        .text((der ?? ""), { lineBreak: false });
       y += 9;
     });
     y += 7;
