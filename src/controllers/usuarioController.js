@@ -29,6 +29,8 @@ const loginUser = async (req, res) => {
       message: "Ingreso exitoso",
       token,
       id: user.id,
+      nombre: user.nombre,
+      apellido: user.apellido,
       email: user.email
     });
 
@@ -52,6 +54,8 @@ const consulta = async (req, res) => {
       where: { id: decoded.id },
       select: {
         id: true,
+        nombre: true,
+        apellido: true,
         email: true
       }
     });
@@ -75,7 +79,7 @@ const consulta = async (req, res) => {
 //crear user
 const registerUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { nombre, apellido, email, password } = req.body;
 
     // Verifica si el usuario ya existe
     const existingUser = await prisma.User.findUnique({ where: { email } });
@@ -88,7 +92,7 @@ const registerUser = async (req, res) => {
 
     // Crea el usuario
     const user = await prisma.User.create({
-      data: { email, password: hashedPassword },
+      data: { nombre, apellido, email, password: hashedPassword },
     });
 
     res.status(201).json({ message: "Usuario creado", user });

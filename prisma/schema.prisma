@@ -10,8 +10,10 @@ datasource db {
 
 //creacion de la tabla o modelo usuario
 model User {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
+  id       Int     @id @default(autoincrement())
+  nombre   String?
+  apellido String?
+  email    String  @unique
   password String
 }
 

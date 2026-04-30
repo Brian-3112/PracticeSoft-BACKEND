@@ -1,0 +1,3 @@
+ALTER TABLE `User`
+  ADD COLUMN `nombre` VARCHAR(191) NULL,
+  ADD COLUMN `apellido` VARCHAR(191) NULL;
