@@ -1,6 +1,12 @@
-const nodemailer = require("nodemailer");
-
 const buildTransporter = () => {
+  let nodemailer;
+  try {
+    // Carga diferida para evitar que toda la app se caiga si falta la dependencia.
+    nodemailer = require("nodemailer");
+  } catch (error) {
+    throw new Error("Falta dependencia nodemailer. Ejecuta: npm install");
+  }
+
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
