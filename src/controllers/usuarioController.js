@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require("@prisma/client");
+const { sendPasswordResetEmail } = require('../services/mailService');
 
 
 const prisma = new PrismaClient();
@@ -143,11 +144,15 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // TODO: Integrar servicio real de correo (SMTP/SendGrid/Resend).
-    console.log(`[PASSWORD_RESET] Enlace para ${email}: ${resetLink}`);
+    await sendPasswordResetEmail({
+      to: user.email,
+      resetLink,
+      nombre: user.nombre
+    });
 
     return res.json({ message: genericMessage });
   } catch (error) {
+    console.error("Error forgotPassword:", error?.message || error);
     return res.status(500).json({ error: "Error enviando enlace de recuperación" });
   }
 };
