@@ -144,11 +144,13 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    await sendPasswordResetEmail({
+    const emailInfo = await sendPasswordResetEmail({
       to: user.email,
       resetLink,
       nombre: user.nombre
     });
+
+    console.log("[PASSWORD_RESET_EMAIL]", emailInfo);
 
     return res.json({ message: genericMessage });
   } catch (error) {

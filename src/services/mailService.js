@@ -25,13 +25,18 @@ const buildTransporter = () => {
 };
 
 const sendPasswordResetEmail = async ({ to, resetLink, nombre }) => {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const from = process.env.SMTP_FROM;
   const appName = process.env.APP_NAME || "PracticeSoft";
   const greetingName = nombre || "usuario";
 
-  const transporter = buildTransporter();
+  if (!from) {
+    throw new Error("Falta SMTP_FROM en variables de entorno");
+  }
 
-  await transporter.sendMail({
+  const transporter = buildTransporter();
+  await transporter.verify();
+
+  const info = await transporter.sendMail({
     from,
     to,
     subject: `Recuperación de contraseña - ${appName}`,
@@ -45,6 +50,16 @@ const sendPasswordResetEmail = async ({ to, resetLink, nombre }) => {
       <p>Si no solicitaste este cambio, ignora este correo.</p>
     `
   });
+
+  if (!info?.accepted?.length) {
+    throw new Error("El proveedor SMTP no aceptó el correo de recuperación");
+  }
+
+  return {
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected
+  };
 };
 
 module.exports = { sendPasswordResetEmail };
