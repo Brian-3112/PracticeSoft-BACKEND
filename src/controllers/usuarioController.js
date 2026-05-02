@@ -118,8 +118,10 @@ const registerUser = async (req, res) => {
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    console.log("[FORGOT_PASSWORD] request recibida", { email });
 
     if (!email) {
+      console.warn("[FORGOT_PASSWORD] email faltante en body");
       return res.status(400).json({ message: "El correo es requerido" });
     }
 
@@ -127,6 +129,7 @@ const forgotPassword = async (req, res) => {
     const genericMessage = "Si el correo está registrado, recibirás un enlace de recuperación";
 
     if (!user) {
+      console.warn("[FORGOT_PASSWORD] email no encontrado en base de datos", { email });
       return res.json({ message: genericMessage });
     }
 
