@@ -8,8 +8,11 @@ const prisma = new PrismaClient();
 
 const RESET_TOKEN_EXPIRY = "20m";
 
-const buildResetLink = (token) => {
-  const resetBaseUrl = process.env.FRONTEND_RESET_PASSWORD_URL;
+const buildResetLink = (token, req) => {
+  const envResetUrl = process.env.FRONTEND_RESET_PASSWORD_URL;
+  const frontendPath = process.env.FRONTEND_RESET_PASSWORD_PATH || "/reset-password";
+  const requestOrigin = req?.headers?.origin;
+  const resetBaseUrl = envResetUrl || (requestOrigin ? `${requestOrigin}${frontendPath}` : null);
 
   if (!resetBaseUrl) {
     return null;
@@ -140,10 +143,10 @@ const forgotPassword = async (req, res) => {
       { expiresIn: RESET_TOKEN_EXPIRY }
     );
 
-    const resetLink = buildResetLink(token);
+    const resetLink = buildResetLink(token, req);
     if (!resetLink) {
       return res.status(500).json({
-        message: "No se configuró FRONTEND_RESET_PASSWORD_URL en el servidor"
+        message: "No se configuró FRONTEND_RESET_PASSWORD_URL ni se pudo inferir desde Origin"
       });
     }
 
