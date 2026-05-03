@@ -25,12 +25,13 @@ const buildTransporter = () => {
 };
 
 const sendPasswordResetEmail = async ({ to, resetLink, nombre }) => {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER || process.env.SMPT_USER;
+  const smtpUser = process.env.SMTP_USER || process.env.SMPT_USER || process.env.MAIL_USER || process.env.EMAIL_USER;
+  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.EMAIL_FROM || smtpUser;
   const appName = process.env.APP_NAME || "PracticeSoft";
   const greetingName = nombre || "usuario";
 
   if (!from) {
-    throw new Error("Falta remitente SMTP: configura SMTP_FROM o SMTP_USER");
+    throw new Error("Falta remitente SMTP: configura SMTP_FROM/MAIL_FROM o SMTP_USER/MAIL_USER");
   }
 
   const transporter = buildTransporter();
