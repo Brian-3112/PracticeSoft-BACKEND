@@ -1,3 +1,12 @@
+const resolveSmtpConfig = () => {
+  const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
+  const port = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
+  const user = process.env.SMTP_USER || process.env.SMPT_USER || process.env.MAIL_USER || process.env.EMAIL_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.SMPT_PASS || process.env.MAIL_PASS || process.env.EMAIL_PASS || process.env.GMAIL_PASS;
+
+  return { host, port, user, pass };
+};
+
 const buildTransporter = () => {
   let nodemailer;
   try {
@@ -7,13 +16,10 @@ const buildTransporter = () => {
     throw new Error("Falta dependencia nodemailer. Ejecuta: npm install");
   }
 
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER || process.env.SMPT_USER;
-  const pass = process.env.SMTP_PASS || process.env.SMPT_PASS;
+  const { host, port, user, pass } = resolveSmtpConfig();
 
   if (!host || !user || !pass) {
-    throw new Error("Configuración SMTP incompleta (revisa SMTP_HOST, SMTP_USER/SMPT_USER y SMTP_PASS/SMPT_PASS)");
+    throw new Error("Configuración SMTP incompleta (revisa host/user/pass en SMTP_*, MAIL_* o GMAIL_*)");
   }
 
   return nodemailer.createTransport({
@@ -25,14 +31,10 @@ const buildTransporter = () => {
 };
 
 const sendPasswordResetEmail = async ({ to, resetLink, nombre }) => {
-  const smtpUser = process.env.SMTP_USER || process.env.SMPT_USER || process.env.MAIL_USER || process.env.EMAIL_USER;
-  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.EMAIL_FROM || smtpUser;
+  const { user: smtpUser } = resolveSmtpConfig();
+  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.EMAIL_FROM || smtpUser || "noreply@localhost";
   const appName = process.env.APP_NAME || "PracticeSoft";
   const greetingName = nombre || "usuario";
-
-  if (!from) {
-    throw new Error("Falta remitente SMTP: configura SMTP_FROM/MAIL_FROM o SMTP_USER/MAIL_USER");
-  }
 
   const transporter = buildTransporter();
   await transporter.verify();
