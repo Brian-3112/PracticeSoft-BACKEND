@@ -9,11 +9,11 @@ const buildTransporter = () => {
 
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER || process.env.SMPT_USER;
+  const pass = process.env.SMTP_PASS || process.env.SMPT_PASS;
 
   if (!host || !user || !pass) {
-    throw new Error("Configuración SMTP incompleta");
+    throw new Error("Configuración SMTP incompleta (revisa SMTP_HOST, SMTP_USER/SMPT_USER y SMTP_PASS/SMPT_PASS)");
   }
 
   return nodemailer.createTransport({
@@ -25,7 +25,7 @@ const buildTransporter = () => {
 };
 
 const sendPasswordResetEmail = async ({ to, resetLink, nombre }) => {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER || process.env.SMPT_USER;
   const appName = process.env.APP_NAME || "PracticeSoft";
   const greetingName = nombre || "usuario";
 
