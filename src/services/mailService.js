@@ -1,10 +1,11 @@
 const resolveSmtpConfig = () => {
   const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
   const port = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
+  const service = process.env.SMTP_SERVICE || process.env.MAIL_SERVICE || process.env.EMAIL_SERVICE || process.env.GMAIL_SERVICE || process.env.EMAIL_PROVIDER;
   const user = process.env.SMTP_USER || process.env.SMPT_USER || process.env.MAIL_USER || process.env.EMAIL_USER || process.env.GMAIL_USER;
   const pass = process.env.SMTP_PASS || process.env.SMPT_PASS || process.env.MAIL_PASS || process.env.EMAIL_PASS || process.env.GMAIL_PASS;
 
-  return { host, port, user, pass };
+  return { host, port, service, user, pass };
 };
 
 const buildTransporter = () => {
@@ -16,16 +17,14 @@ const buildTransporter = () => {
     throw new Error("Falta dependencia nodemailer. Ejecuta: npm install");
   }
 
-  const { host, port, user, pass } = resolveSmtpConfig();
+  const { host, port, service, user, pass } = resolveSmtpConfig();
 
-  if (!host || !user || !pass) {
-    throw new Error("Configuración SMTP incompleta (revisa host/user/pass en SMTP_*, MAIL_* o GMAIL_*)");
+  if (!user || !pass || (!host && !service)) {
+    throw new Error("Configuración SMTP incompleta (revisa host o service, y user/pass en SMTP_*, MAIL_*, EMAIL_* o GMAIL_*)");
   }
 
   return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
+    ...(service ? { service } : { host, port, secure: port === 465 }),
     auth: { user, pass }
   });
 };
