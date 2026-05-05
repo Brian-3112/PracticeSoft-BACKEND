@@ -9,6 +9,8 @@ const prisma = new PrismaClient();
 const RESET_TOKEN_EXPIRY = "20m";
 const SMTP_CONFIG_ERROR_FRAGMENT = "Configuración SMTP incompleta";
 
+const isTruthyFlag = (value) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+
 const buildResetLink = (token, req) => {
   const envResetUrl = process.env.FRONTEND_RESET_PASSWORD_URL;
   const frontendPath = process.env.FRONTEND_RESET_PASSWORD_PATH || "/reset-password";
@@ -164,6 +166,16 @@ const forgotPassword = async (req, res) => {
       console.error("[FORGOT_PASSWORD] fallo enviando email:", mailError?.message || mailError);
 
       if ((mailError?.message || "").includes(SMTP_CONFIG_ERROR_FRAGMENT)) {
+        if (isTruthyFlag(process.env.ALLOW_PASSWORD_RESET_WITHOUT_EMAIL)) {
+          console.warn("[FORGOT_PASSWORD] SMTP no configurado: se habilita fallback sin correo");
+          return res.status(200).json({
+            message: "Servicio de correo no configurado. Usa el enlace de recuperación devuelto por backend.",
+            errorCode: "SMTP_NOT_CONFIGURED",
+            resetLink,
+            token
+          });
+        }
+
         return res.status(503).json({
           message: "Servicio de correo no configurado. Contacta al administrador.",
           errorCode: "SMTP_NOT_CONFIGURED"
