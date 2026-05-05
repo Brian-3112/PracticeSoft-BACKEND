@@ -7,6 +7,7 @@ const { sendPasswordResetEmail } = require('../services/mailService');
 const prisma = new PrismaClient();
 
 const RESET_TOKEN_EXPIRY = "20m";
+const SMTP_CONFIG_ERROR_FRAGMENT = "Configuración SMTP incompleta";
 
 const buildResetLink = (token, req) => {
   const envResetUrl = process.env.FRONTEND_RESET_PASSWORD_URL;
@@ -150,15 +151,30 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    const emailInfo = await sendPasswordResetEmail({
-      to: user.email,
-      resetLink,
-      nombre: user.nombre
-    });
+    try {
+      const emailInfo = await sendPasswordResetEmail({
+        to: user.email,
+        resetLink,
+        nombre: user.nombre
+      });
 
-    console.log("[PASSWORD_RESET_EMAIL]", emailInfo);
+      console.log("[PASSWORD_RESET_EMAIL]", emailInfo);
+      return res.json({ message: genericMessage });
+    } catch (mailError) {
+      console.error("[FORGOT_PASSWORD] fallo enviando email:", mailError?.message || mailError);
 
-    return res.json({ message: genericMessage });
+      if ((mailError?.message || "").includes(SMTP_CONFIG_ERROR_FRAGMENT)) {
+        return res.status(503).json({
+          message: "Servicio de correo no configurado. Contacta al administrador.",
+          errorCode: "SMTP_NOT_CONFIGURED"
+        });
+      }
+
+      return res.status(502).json({
+        message: "No se pudo enviar el correo de recuperación. Intenta nuevamente.",
+        errorCode: "EMAIL_DELIVERY_FAILED"
+      });
+    }
   } catch (error) {
     console.error("Error forgotPassword:", error?.message || error);
     return res.status(500).json({ error: "Error enviando enlace de recuperación" });
