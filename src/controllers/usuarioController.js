@@ -165,9 +165,20 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+const resolveResetPayload = (req) => {
+  const tokenFromBody = req?.body?.token;
+  const tokenFromParams = req?.params?.token;
+  const tokenFromQuery = req?.query?.token;
+
+  return {
+    token: tokenFromBody || tokenFromParams || tokenFromQuery,
+    password: req?.body?.password
+  };
+};
+
 const resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { token, password } = resolveResetPayload(req);
 
     if (!token || !password) {
       return res.status(400).json({ message: "Token y nueva contraseña son requeridos" });
