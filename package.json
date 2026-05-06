@@ -2,9 +2,11 @@
   "name": "creatividad-back",
   "version": "1.0.0",
   "description": "newproyect",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "build": "npx prisma generate"
   },
   "author": "",
   "license": "ISC",
