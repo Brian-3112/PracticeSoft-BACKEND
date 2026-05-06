@@ -10,7 +10,11 @@ app.use(express.json());
 
 const port = process.env.PORT || 4000;
 
- 
+
+app.get("/debug-users", async (req, res) => {
+    const users = await prisma.user.findMany();
+    res.json(users);
+});
 ///Middlewares
 app.use(cors());
 
