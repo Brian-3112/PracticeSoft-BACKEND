@@ -4,8 +4,8 @@ services:
     env: node
     plan: free
     branch: main
-    buildCommand: npm install && npx prisma generate
-    startCommand: node app.js
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
     preDeployCommand: npx prisma migrate deploy
     envVars:
       - key: DATABASE_URL
