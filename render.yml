@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: PracticeSoft-BACKEND
+    env: node
+    plan: free
+    branch: main
+    buildCommand: npm install && npx prisma generate
+    startCommand: node app.js
+    preDeployCommand: npx prisma migrate deploy
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
