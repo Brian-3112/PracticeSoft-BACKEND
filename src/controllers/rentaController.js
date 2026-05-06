@@ -1132,8 +1132,27 @@ const descargarContratoDocx = async (req, res) => {
     }
 };
 
-    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx };
+const deleteRenta = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({ error: "ID de renta inválido" });
+        }
 
+        const rentaExistente = await prisma.renta.findUnique({ where: { id } });
+        if (!rentaExistente) {
+            return res.status(404).json({ error: "Renta no encontrada" });
+        }
+
+        await prisma.renta.delete({ where: { id } });
+        return res.status(200).json({ message: "Renta eliminada correctamente", id });
+    } catch (error) {
+        console.error("Error eliminando la renta:", error);
+        return res.status(500).json({ error: "Error eliminando la renta" });
+    }
+};
+
+    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx, deleteRenta };
 
 
 
