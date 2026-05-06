@@ -8,6 +8,9 @@
     "dev": "nodemon app.js",
     "build": "npx prisma generate"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
