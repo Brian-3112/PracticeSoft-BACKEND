@@ -4,18 +4,27 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash('123456', 10);
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!email || !password) {
+    throw new Error('Faltan variables ADMIN_EMAIL o ADMIN_PASSWORD');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
 
   await prisma.user.upsert({
-    where: { email: 'parejabrianh31@gmail.com' },
+    where: { email },
     update: {},
     create: {
       nombre: 'Brian',
       apellido: 'Pareja',
-      email: 'parejabrianh31@gmail.com',
+      email,
       password: passwordHash,
     },
   });
+
+  console.log('Usuario administrador creado correctamente');
 }
 
 main()
