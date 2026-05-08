@@ -6,7 +6,7 @@ const authenticateToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   
   if (!token) {
-    return res.status(401).json({ message: "Access token required" });
+    return res.status(401).json({ message: "Token no proporcionado" });
   }
 
   try {
@@ -19,7 +19,7 @@ const authenticateToken = (req, res, next) => {
     // Llama a `next()` para continuar hacia la ruta protegida
     next();
   } catch (error) {
-    res.status(403).json({ message: "Invalid token" });
+    return res.status(401).json({ message: "Token inválido o expirado" });
   }
 };
 

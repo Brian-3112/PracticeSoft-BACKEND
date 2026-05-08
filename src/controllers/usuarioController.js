@@ -42,16 +42,8 @@ const loginUser = async (req, res) => {
 //getttt
 const consulta = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ message: 'Token no proporcionado' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const user = await prisma.User.findUnique({
-      where: { id: decoded.id },
+      where: { id: req.user.id },
       select: {
         id: true,
         nombre: true,
@@ -68,9 +60,6 @@ const consulta = async (req, res) => {
 
   } catch (error) {
     console.error('Error en consulta:', error);
-    if (error?.name === "JsonWebTokenError" || error?.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Token inválido o expirado" });
-    }
     res.status(500).json({ error: "Error obteniendo perfil del usuario" });
   }
 };
@@ -101,5 +90,49 @@ const registerUser = async (req, res) => {
   }
 };
 
+//cambiar password de usuario autenticado
+const cambiarPassword = async (req, res) => {
+  try {
+    const currentPassword = req.body.currentPassword || req.body.passwordActual;
+    const newPassword = req.body.newPassword || req.body.nuevaPassword || req.body.password;
 
-module.exports = { loginUser, consulta, registerUser };
+    if (typeof currentPassword !== "string" || !currentPassword) {
+      return res.status(400).json({ message: "La contraseña actual es requerida" });
+    }
+
+    if (typeof newPassword !== "string" || !newPassword) {
+      return res.status(400).json({ message: "La nueva contraseña es requerida" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "La nueva contraseña debe tener mínimo 6 caracteres" });
+    }
+
+    const user = await prisma.User.findUnique({
+      where: { id: req.user.id },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ message: "La contraseña actual no es correcta" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.User.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    return res.status(200).json({ message: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    console.error('Error cambiando password:', error);
+    return res.status(500).json({ error: "Error cambiando contraseña" });
+  }
+};
+
+module.exports = { loginUser, consulta, registerUser, cambiarPassword };
