@@ -67,3 +67,16 @@ model Renta {
   vehiculo   Vehiculo @relation(fields: [vehiculoId], references: [id])
   cliente    Cliente  @relation(fields: [clienteId], references: [id])
 }
+// Tabla Documentacion
+model Documentacion {
+  id              Int      @id @default(autoincrement())
+  nombreCliente   String
+  cedula          String
+  fechaContrato   DateTime @db.Date
+  archivoNombre   String
+  archivoMimeType String
+  archivoPath     String
+  archivoSize     Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

@@ -4,6 +4,7 @@ const routerUsuario  = require('./usuarioRouter');
 const routerVehiculo = require('./vehiculoRouter'); 
 const routerCliente =  require('./clienteRouter'); 
 const routerRenta = require('./rentaRouter');
+const routerDocumentacion = require('./documentacionRouter');
 
 
 
@@ -17,6 +18,7 @@ function routerApi(app){
     router.use('/vehiculos', routerVehiculo);
     router.use('/clientes', routerCliente);
     router.use('/rentas', routerRenta);
+    router.use('/documentacion', routerDocumentacion);
 
     
     
