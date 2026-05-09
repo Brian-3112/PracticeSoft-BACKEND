@@ -303,6 +303,59 @@ const crearDocumentacion = async (req, res) => {
     }
 };
 
+
+const eliminarDocumentacion = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({ message: "ID de documento inválido" });
+        }
+
+        await ensureDocumentacionTable();
+        const documentos = await prisma.$queryRaw`
+            SELECT
+                id,
+                archivoPath
+            FROM \`Documentacion\`
+            WHERE id = ${id}
+            LIMIT 1
+        `;
+        const documento = documentos[0];
+
+        if (!documento) {
+            return res.status(404).json({ message: "Documento no encontrado" });
+        }
+
+        if (documento.archivoPath) {
+            const archivoPathAbsoluto = path.resolve(process.cwd(), documento.archivoPath);
+            const uploadRoot = path.resolve(UPLOAD_DIR);
+
+            if (!archivoPathAbsoluto.startsWith(`${uploadRoot}${path.sep}`)) {
+                return res.status(500).json({ message: "No fue posible eliminar el archivo asociado" });
+            }
+
+            try {
+                await fs.promises.unlink(archivoPathAbsoluto);
+            } catch (fileError) {
+                if (fileError.code !== "ENOENT") {
+                    console.error("Error eliminando archivo de documentación:", fileError);
+                    return res.status(500).json({ message: "No fue posible eliminar el archivo asociado" });
+                }
+            }
+        }
+
+        await prisma.$executeRaw`
+            DELETE FROM \`Documentacion\`
+            WHERE id = ${id}
+        `;
+
+        return res.status(200).json({ message: "Documento eliminado correctamente" });
+    } catch (error) {
+        console.error("Error eliminando documento de documentación:", error);
+        return res.status(500).json({ message: "No fue posible eliminar el documento" });
+    }
+};
+
 const descargarArchivoDocumentacion = async (req, res) => {
     try {
         const id = parseInt(req.params.id, 10);
@@ -351,4 +404,9 @@ const descargarArchivoDocumentacion = async (req, res) => {
     }
 };
 
-module.exports = { consultarDocumentacion, crearDocumentacion, descargarArchivoDocumentacion };
+module.exports = {
+    consultarDocumentacion,
+    crearDocumentacion,
+    descargarArchivoDocumentacion,
+    eliminarDocumentacion,
+};
