@@ -287,6 +287,24 @@ const fillReferenceSection = (xml, cliente = {}) => {
 
     return xml.slice(0, tableStart) + updatedTable + xml.slice(tableEnd + 8);
 };
+
+const compactFinalSignatureSpacing = (xml) => {
+    const signatureIndex = xml.lastIndexOf("ARRENDATARIO:");
+    if (signatureIndex === -1) return xml;
+
+    const signatureParagraphStart = xml.lastIndexOf("<w:p", signatureIndex);
+    if (signatureParagraphStart === -1) return xml;
+
+    let beforeSignature = xml.slice(0, signatureParagraphStart);
+    const signatureAndAfter = xml.slice(signatureParagraphStart);
+    const emptyParagraphBeforeSignature = /<w:p\b(?:(?!<w:t\b|<w:drawing\b)[\s\S])*?<\/w:p>\s*$/;
+
+    for (let removed = 0; removed < 3 && emptyParagraphBeforeSignature.test(beforeSignature); removed += 1) {
+        beforeSignature = beforeSignature.replace(emptyParagraphBeforeSignature, "");
+    }
+
+    return beforeSignature + signatureAndAfter;
+};
 const fillContratoTemplate = (templatePath, renta, options = {}) => {
       const zip = new AdmZip(templatePath);
       const entry = zip.getEntry("word/document.xml");
@@ -435,6 +453,7 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
           xml = xml.replace(new RegExp(placaTmpMarker, "g"), "X");
       }
       xml = fillMontoTotalEnRojo(xml, valorTotal);
+      xml = compactFinalSignatureSpacing(xml);
 
       zip.updateFile("word/document.xml", Buffer.from(xml, "utf8"));
       return zip.toBuffer();
