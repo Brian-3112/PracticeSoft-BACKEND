@@ -295,9 +295,17 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
       }
 
       let xml = zip.readAsText(entry);
-      const { sinDatosCliente = false } = options;
-      const cliente = sinDatosCliente ? {} : (renta.cliente || {});
-      const vehiculo = renta.vehiculo || {};
+      const { contratoVacio = false } = options;
+      const cliente = contratoVacio ? {} : (renta.cliente || {});
+      const vehiculo = contratoVacio ? {} : (renta.vehiculo || {});
+      const fechaEntrega = contratoVacio ? "" : formatDateDMY(renta.fechaEntrega);
+      const fechaDevolucion = contratoVacio ? "" : formatDateDMY(renta.fechaDevolucion);
+      const horaEntrega = contratoVacio ? "" : formatHourAmPm(renta.horaEntrega);
+      const horaDevolucion = contratoVacio ? "" : formatHourAmPm(renta.horaDevolucion);
+      const numeroDias = contratoVacio ? "" : String(renta.numeroDias || 0);
+      const valorDia = contratoVacio ? "" : formatMoney(renta.valorDia);
+      const valorTotal = contratoVacio ? "" : formatMoney(renta.valorTotal);
+      const formaPago = contratoVacio ? "" : "Efectivo - Transferencia";
 
       // Placeholders visibles en la portada del contrato.
       const nombreArrendatario = toTitleCaseName(cliente.nombre || "");
@@ -346,28 +354,28 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
       xml = fillCellAfterHeaderOccurrence(
           xml,
           "FECHA ENTREGA",
-          formatDateDMY(renta.fechaEntrega),
+          fechaEntrega,
           1,
           (text) => buildStyledTextRun(text, { size: 18 })
       );
       xml = fillCellAfterHeaderOccurrence(
           xml,
           "FECHA DEVOLUCION",
-          formatDateDMY(renta.fechaDevolucion),
+          fechaDevolucion,
           1,
           (text) => buildStyledTextRun(text, { size: 18 })
       );
       xml = fillCellAfterHeaderOccurrence(
           xml,
           "FECHE DEVOLUCION",
-          formatDateDMY(renta.fechaDevolucion),
+          fechaDevolucion,
           1,
           (text) => buildStyledTextRun(text, { size: 18 })
       );
       xml = fillCellAfterHeaderOccurrenceWithAlignment(
           xml,
           "HORA:",
-          formatHourAmPm(renta.horaEntrega),
+          horaEntrega,
           1,
           "center",
           (text) => buildStyledTextRun(text, { size: 18 })
@@ -375,16 +383,16 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
       xml = fillCellAfterHeaderOccurrenceWithAlignment(
           xml,
           "HORA:",
-          formatHourAmPm(renta.horaDevolucion),
+          horaDevolucion,
           2,
           "center",
           (text) => buildStyledTextRun(text, { size: 18 })
       );
-      xml = fillCellAfterHeaderWithAlignment(xml, "No. DIAS", String(renta.numeroDias || 0), "center");
+      xml = fillCellAfterHeaderWithAlignment(xml, "No. DIAS", numeroDias, "center");
       xml = fillCellAfterHeaderOccurrenceWithAlignment(
           xml,
           "VALOR DIA",
-          formatMoney(renta.valorDia),
+          valorDia,
           1,
           "center",
           (text) => buildStyledTextRun(text, { size: 18 })
@@ -392,30 +400,41 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
       xml = fillCellAfterHeaderOccurrenceWithAlignment(
           xml,
           "FORMA DE PAGO",
-          "Efectivo - Transferencia",
+          formaPago,
           1,
           "center",
           (text) => buildStyledTextRun(text, { size: 18 })
       );
       const placaTmpMarker = "__PLACA_TMP__";
-      xml = fillCellAfterHeaderOccurrenceWithAlignment(
-          xml,
-          "OTROS",
-          placaTmpMarker,
-          1,
-          "center",
-          (text) => buildStyledTextRun(text, { size: 16 })
-      );
-      xml = fillCellAfterHeaderOccurrenceWithAlignment(
-          xml,
-          placaTmpMarker,
-          vehiculo.placa || "",
-          1,
-          "center",
-          (text) => buildStyledTextRun(text, { size: 16 })
-      );
-      xml = xml.replace(new RegExp(placaTmpMarker, "g"), "X");
-      xml = fillMontoTotalEnRojo(xml, formatMoney(renta.valorTotal));
+      if (contratoVacio) {
+          xml = fillCellAfterHeaderOccurrenceWithAlignment(
+              xml,
+              "OTROS",
+              "",
+              1,
+              "center",
+              (text) => buildStyledTextRun(text, { size: 16 })
+          );
+      } else {
+          xml = fillCellAfterHeaderOccurrenceWithAlignment(
+              xml,
+              "OTROS",
+              placaTmpMarker,
+              1,
+              "center",
+              (text) => buildStyledTextRun(text, { size: 16 })
+          );
+          xml = fillCellAfterHeaderOccurrenceWithAlignment(
+              xml,
+              placaTmpMarker,
+              vehiculo.placa || "",
+              1,
+              "center",
+              (text) => buildStyledTextRun(text, { size: 16 })
+          );
+          xml = xml.replace(new RegExp(placaTmpMarker, "g"), "X");
+      }
+      xml = fillMontoTotalEnRojo(xml, valorTotal);
 
       zip.updateFile("word/document.xml", Buffer.from(xml, "utf8"));
       return zip.toBuffer();
@@ -1150,7 +1169,7 @@ const descargarContratoVacioDocx = async (req, res) => {
             return res.status(500).json({ error: "No se encontró la plantilla del contrato" });
         }
 
-        const docxBuffer = fillContratoTemplate(templatePath, renta, { sinDatosCliente: true });
+        const docxBuffer = fillContratoTemplate(templatePath, renta, { contratoVacio: true });
         res.setHeader(
             "Content-Type",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
