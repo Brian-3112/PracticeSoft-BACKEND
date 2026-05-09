@@ -18,6 +18,33 @@ const ALLOWED_MIME_TYPES = new Set([
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
+let ensureDocumentacionTablePromise = null;
+
+const ensureDocumentacionTable = () => {
+    if (!ensureDocumentacionTablePromise) {
+        ensureDocumentacionTablePromise = prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS \`Documentacion\` (
+                \`id\` INTEGER NOT NULL AUTO_INCREMENT,
+                \`nombreCliente\` VARCHAR(191) NOT NULL,
+                \`cedula\` VARCHAR(191) NOT NULL,
+                \`fechaContrato\` DATE NOT NULL,
+                \`archivoNombre\` VARCHAR(191) NOT NULL,
+                \`archivoMimeType\` VARCHAR(191) NOT NULL,
+                \`archivoPath\` VARCHAR(191) NOT NULL,
+                \`archivoSize\` INTEGER NULL,
+                \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (\`id\`)
+            ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        `).catch((error) => {
+            ensureDocumentacionTablePromise = null;
+            throw error;
+        });
+    }
+
+    return ensureDocumentacionTablePromise;
+};
+
 const parseDateOnly = (value) => {
     const raw = String(value ?? "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
@@ -35,6 +62,10 @@ const parseDateOnly = (value) => {
 };
 
 const formatDate = (value) => {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        return value.slice(0, 10);
+    }
+
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) return "";
     const year = value.getUTCFullYear();
     const month = String(value.getUTCMonth() + 1).padStart(2, "0");
@@ -161,9 +192,21 @@ const parseMultipartForm = async (req) => {
 
 const consultarDocumentacion = async (_req, res) => {
     try {
-        const documentos = await prisma.documentacion.findMany({
-            orderBy: { createdAt: "desc" },
-        });
+        await ensureDocumentacionTable();
+        const documentos = await prisma.$queryRaw`
+            SELECT
+                id,
+                nombreCliente,
+                cedula,
+                fechaContrato,
+                archivoNombre,
+                archivoMimeType,
+                archivoSize,
+                createdAt,
+                updatedAt
+            FROM \`Documentacion\`
+            ORDER BY createdAt DESC
+        `;
 
         return res.status(200).json(documentos.map(formatDocumento));
     } catch (error) {
@@ -198,16 +241,48 @@ const crearDocumentacion = async (req, res) => {
 
         await fs.promises.writeFile(archivoPathAbsoluto, archivo.buffer, { flag: "wx" });
 
-        const documento = await prisma.documentacion.create({
-            data: {
-                nombreCliente,
-                cedula,
-                fechaContrato,
-                archivoNombre: archivo.originalName,
-                archivoMimeType: archivo.mimeType,
-                archivoPath,
-                archivoSize: archivo.size,
-            },
+        await ensureDocumentacionTable();
+        const documento = await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`
+                INSERT INTO \`Documentacion\` (
+                    nombreCliente,
+                    cedula,
+                    fechaContrato,
+                    archivoNombre,
+                    archivoMimeType,
+                    archivoPath,
+                    archivoSize,
+                    updatedAt
+                ) VALUES (
+                    ${nombreCliente},
+                    ${cedula},
+                    ${formatDate(fechaContrato)},
+                    ${archivo.originalName},
+                    ${archivo.mimeType},
+                    ${archivoPath},
+                    ${archivo.size},
+                    CURRENT_TIMESTAMP(3)
+                )
+            `;
+
+            const documentos = await tx.$queryRaw`
+                SELECT
+                    id,
+                    nombreCliente,
+                    cedula,
+                    fechaContrato,
+                    archivoNombre,
+                    archivoMimeType,
+                    archivoPath,
+                    archivoSize,
+                    createdAt,
+                    updatedAt
+                FROM \`Documentacion\`
+                WHERE id = LAST_INSERT_ID()
+                LIMIT 1
+            `;
+
+            return documentos[0];
         });
 
         return res.status(201).json({
@@ -235,7 +310,24 @@ const descargarArchivoDocumentacion = async (req, res) => {
             return res.status(400).json({ error: "ID de documento inválido" });
         }
 
-        const documento = await prisma.documentacion.findUnique({ where: { id } });
+        await ensureDocumentacionTable();
+        const documentos = await prisma.$queryRaw`
+            SELECT
+                id,
+                nombreCliente,
+                cedula,
+                fechaContrato,
+                archivoNombre,
+                archivoMimeType,
+                archivoPath,
+                archivoSize,
+                createdAt,
+                updatedAt
+            FROM \`Documentacion\`
+            WHERE id = ${id}
+            LIMIT 1
+        `;
+        const documento = documentos[0];
         if (!documento) return res.status(404).json({ error: "Documento no encontrado" });
 
         const archivoPathAbsoluto = path.resolve(process.cwd(), documento.archivoPath);
