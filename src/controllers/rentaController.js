@@ -287,7 +287,7 @@ const fillReferenceSection = (xml, cliente = {}) => {
 
     return xml.slice(0, tableStart) + updatedTable + xml.slice(tableEnd + 8);
 };
-const fillContratoTemplate = (templatePath, renta) => {
+const fillContratoTemplate = (templatePath, renta, options = {}) => {
       const zip = new AdmZip(templatePath);
       const entry = zip.getEntry("word/document.xml");
       if (!entry) {
@@ -295,7 +295,8 @@ const fillContratoTemplate = (templatePath, renta) => {
       }
 
       let xml = zip.readAsText(entry);
-      const cliente = renta.cliente || {};
+      const { sinDatosCliente = false } = options;
+      const cliente = sinDatosCliente ? {} : (renta.cliente || {});
       const vehiculo = renta.vehiculo || {};
 
       // Placeholders visibles en la portada del contrato.
@@ -1132,6 +1133,39 @@ const descargarContratoDocx = async (req, res) => {
     }
 };
 
+const descargarContratoVacioDocx = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const renta = await prisma.renta.findUnique({
+            where: { id: parseInt(id) },
+            include: { cliente: true, vehiculo: true },
+        });
+
+        if (!renta) {
+            return res.status(404).json({ error: "Renta no encontrada" });
+        }
+
+        const templatePath = path.join(__dirname, "..", "assets", "contrato-template.docx");
+        if (!fs.existsSync(templatePath)) {
+            return res.status(500).json({ error: "No se encontró la plantilla del contrato" });
+        }
+
+        const docxBuffer = fillContratoTemplate(templatePath, renta, { sinDatosCliente: true });
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="contrato-vacio-renta-${renta.id}.docx"`
+        );
+        return res.status(200).send(docxBuffer);
+    } catch (error) {
+        console.error("Error descargando contrato vacío DOCX:", error);
+        return res.status(500).json({ error: "Error generando contrato vacío DOCX" });
+    }
+};
+
 const deleteRenta = async (req, res) => {
     try {
         const id = parseInt(req.params.id, 10);
@@ -1152,7 +1186,7 @@ const deleteRenta = async (req, res) => {
     }
 };
 
-    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx, deleteRenta };
+    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx, descargarContratoVacioDocx, deleteRenta };
 
 
 
