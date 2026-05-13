@@ -305,6 +305,46 @@ const compactFinalSignatureSpacing = (xml) => {
 
     return beforeSignature + signatureAndAfter;
 };
+
+const replaceDocxTextPlaceholder = (xml, placeholder, value) => {
+    const safePlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(<w:t[^>]*>)([^<]*?)${safePlaceholder}([^<]*?)(<\/w:t>)`, "g");
+    return xml.replace(regex, (_match, openTag, before, after, closeTag) => (
+        `${openTag}${before}${escapeXml(value)}${after}${closeTag}`
+    ));
+};
+
+const fillContratoResponsabilidadTemplate = (templatePath, renta) => {
+    const zip = new AdmZip(templatePath);
+    const entry = zip.getEntry("word/document.xml");
+    if (!entry) {
+        throw new Error("No se encontró word/document.xml en la plantilla");
+    }
+
+    const cliente = renta.cliente || {};
+    const vehiculo = renta.vehiculo || {};
+    let xml = zip.readAsText(entry);
+
+    const replacements = [
+        ["NOMBRE DEL CLIENTE", toTitleCaseName(cliente.nombre || "")],
+        ["CEDULA DEL CLIENTE", cliente.identificacion || ""],
+        ["NOMBRE DEL VEHICULO", vehiculo.nombreVehiculo || ""],
+        ["NUMERO DE PLACA", vehiculo.placa || ""],
+        ["FEHCA INIICO", formatDateDMY(renta.fechaEntrega)],
+        ["HORA ENTREGA", formatHourAmPm(renta.horaDevolucion)],
+        ["FECHA FIN", formatDateDMY(renta.fechaDevolucion)],
+        ["HORA", formatHourAmPm(renta.horaEntrega)],
+        ["FECHA DE HOY", formatDateDMY(new Date())],
+    ];
+
+    replacements.forEach(([placeholder, value]) => {
+        xml = replaceDocxTextPlaceholder(xml, placeholder, value);
+    });
+
+    zip.updateFile("word/document.xml", Buffer.from(xml, "utf8"));
+    return zip.toBuffer();
+};
+
 const fillContratoTemplate = (templatePath, renta, options = {}) => {
       const zip = new AdmZip(templatePath);
       const entry = zip.getEntry("word/document.xml");
@@ -1204,6 +1244,40 @@ const descargarContratoVacioDocx = async (req, res) => {
     }
 };
 
+
+const descargarContratoResponsabilidadDocx = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const renta = await prisma.renta.findUnique({
+            where: { id: parseInt(id) },
+            include: { cliente: true, vehiculo: true },
+        });
+
+        if (!renta) {
+            return res.status(404).json({ error: "Renta no encontrada" });
+        }
+
+        const templatePath = path.join(__dirname, "..", "assets", "CERTIFICADO-RESPONSABILIDAD.docx");
+        if (!fs.existsSync(templatePath)) {
+            return res.status(500).json({ error: "No se encontró la plantilla del certificado de responsabilidad" });
+        }
+
+        const docxBuffer = fillContratoResponsabilidadTemplate(templatePath, renta);
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=contrato-responsabilidad-renta-${renta.id}.docx`
+        );
+        return res.status(200).send(docxBuffer);
+    } catch (error) {
+        console.error("Error descargando certificado de responsabilidad DOCX:", error);
+        return res.status(500).json({ error: "Error generando certificado de responsabilidad DOCX" });
+    }
+};
+
 const deleteRenta = async (req, res) => {
     try {
         const id = parseInt(req.params.id, 10);
@@ -1224,7 +1298,7 @@ const deleteRenta = async (req, res) => {
     }
 };
 
-    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx, descargarContratoVacioDocx, deleteRenta };
+    module.exports = { consultar, registerRenta, generarComprobante, descargarContratoDocx, descargarContratoVacioDocx, descargarContratoResponsabilidadDocx, deleteRenta };
 
 
 

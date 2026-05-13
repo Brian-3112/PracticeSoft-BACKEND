@@ -1,5 +1,5 @@
 const express = require('express');
-const { consultar, registerRenta, generarComprobante, descargarContratoDocx, descargarContratoVacioDocx, deleteRenta } = require('../controllers/rentaController');
+const { consultar, registerRenta, generarComprobante, descargarContratoDocx, descargarContratoVacioDocx, descargarContratoResponsabilidadDocx, deleteRenta } = require('../controllers/rentaController');
 
 const router = express.Router();
 
@@ -14,6 +14,8 @@ router.get("/:id/comprobante", generarComprobante);
 router.get("/:id/contrato.docx", descargarContratoDocx);
 // Descargar contrato vacío DOCX
 router.get("/:id/contrato-vacio.docx", descargarContratoVacioDocx);
+// Descargar certificado de responsabilidad DOCX
+router.get("/:id/contrato-responsabilidad.docx", descargarContratoResponsabilidadDocx);
 // Eliminar renta
 router.delete("/:id", deleteRenta);
 
