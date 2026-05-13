@@ -58,6 +58,21 @@ const formatDateDMY = (value) => {
     const year = date.getUTCFullYear();
     return `${day}-${month}-${year}`;
 };
+
+const formatCurrentBogotaDateLong = () => {
+    const parts = new Intl.DateTimeFormat("es-CO", {
+        timeZone: "America/Bogota",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    }).formatToParts(new Date());
+
+    const day = parts.find((part) => part.type === "day")?.value || "";
+    const month = parts.find((part) => part.type === "month")?.value || "";
+    const year = parts.find((part) => part.type === "year")?.value || "";
+
+    return `${day} DE ${month.toUpperCase()} ${year}`.trim();
+};
 const toTitleCaseName = (value) =>
     String(value ?? "")
         .trim()
@@ -334,7 +349,7 @@ const fillContratoResponsabilidadTemplate = (templatePath, renta) => {
         ["HORA ENTREGA", formatHourAmPm(renta.horaDevolucion)],
         ["FECHA FIN", formatDateDMY(renta.fechaDevolucion)],
         ["HORA", formatHourAmPm(renta.horaEntrega)],
-        ["FECHA DE HOY", formatDateDMY(new Date())],
+        ["FECHA DE HOY", formatCurrentBogotaDateLong()],
     ];
 
     replacements.forEach(([placeholder, value]) => {
