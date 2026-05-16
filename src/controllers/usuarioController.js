@@ -25,7 +25,7 @@ const normalizeAllowedModules = (allowedModules) => {
 };
 
 const getAllowedModulesForUser = (user) => {
-  if (user.role === "admin") return ADMIN_ALLOWED_MODULES;
+  if ((user.role || (user.isTemporary ? "temporal" : "admin")) === "admin") return ADMIN_ALLOWED_MODULES;
   if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules;
   return TEMPORARY_ALLOWED_MODULES;
 };
@@ -36,7 +36,7 @@ const formatUserResponse = (user) => ({
   apellido: user.apellido,
   correo: user.email,
   email: user.email,
-  role: user.role || "admin",
+  role: user.role || (user.isTemporary ? "temporal" : "admin"),
   isTemporary: Boolean(user.isTemporary),
   isActive: user.isActive !== false,
   allowedModules: getAllowedModulesForUser(user),
@@ -49,7 +49,7 @@ const formatUserResponse = (user) => ({
 const buildTokenPayload = (user) => ({
   id: user.id,
   email: user.email,
-  role: user.role || "admin",
+  role: user.role || (user.isTemporary ? "temporal" : "admin"),
   isTemporary: Boolean(user.isTemporary),
   allowedModules: getAllowedModulesForUser(user),
 });
@@ -163,7 +163,6 @@ const registerUser = async (req, res) => {
         apellido,
         email,
         password: hashedPassword,
-        role: "admin",
         isTemporary: false,
         isActive: true,
         allowedModules: ADMIN_ALLOWED_MODULES,
@@ -265,7 +264,6 @@ const createTemporaryUser = async (req, res) => {
         apellido,
         email,
         password: hashedPassword,
-        role: "temporal",
         isTemporary: true,
         isActive: true,
         allowedModules,
@@ -287,8 +285,8 @@ const createTemporaryUser = async (req, res) => {
 const listTemporaryUsers = async (_req, res) => {
   try {
     const users = await prisma.User.findMany({
-      where: { role: "temporal" },
-      orderBy: { createdAt: "desc" },
+      where: { isTemporary: true },
+      orderBy: { id: "desc" },
     });
 
     return res.status(200).json(users.map(formatUserResponse));
@@ -312,7 +310,7 @@ const changeTemporaryUserPassword = async (req, res) => {
     }
 
     const user = await prisma.User.findUnique({ where: { id } });
-    if (!user || user.role !== "temporal") {
+    if (!user || user.isTemporary !== true) {
       return res.status(404).json({ message: "Usuario temporal no encontrado" });
     }
 
@@ -343,7 +341,7 @@ const updateTemporaryUserStatus = async (req, res) => {
     }
 
     const user = await prisma.User.findUnique({ where: { id } });
-    if (!user || user.role !== "temporal") {
+    if (!user || user.isTemporary !== true) {
       return res.status(404).json({ message: "Usuario temporal no encontrado" });
     }
 
@@ -374,7 +372,7 @@ const deleteTemporaryUser = async (req, res) => {
     }
 
     const user = await prisma.User.findUnique({ where: { id } });
-    if (!user || user.role !== "temporal") {
+    if (!user || user.isTemporary !== true) {
       return res.status(404).json({ message: "Usuario temporal no encontrado" });
     }
 
