@@ -59,6 +59,38 @@ const formatDateDMY = (value) => {
     return `${day}-${month}-${year}`;
 };
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const TIPO_CALCULO_PERIODO_24_HORAS = "periodo_24_horas";
+const TIPO_CALCULO_DIA_CALENDARIO = "dia_calendario";
+
+const normalizeBoolean = (value) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        return ["true", "1", "si", "sí", "yes"].includes(normalized);
+    }
+    if (typeof value === "number") return value === 1;
+    return false;
+};
+
+const calculateDiasPeriodo24Horas = (fechaInicio, fechaFin) =>
+    Math.ceil((fechaFin - fechaInicio) / MS_PER_DAY);
+
+const calculateDiasCalendarioInclusivos = (fechaInicio, fechaFin) =>
+    Math.floor((fechaFin - fechaInicio) / MS_PER_DAY) + 1;
+
+const calculateRentalTotals = ({ fechaInicio, fechaFin, valorDia, cobroDiaCalendario }) => {
+    const diasCobrados = cobroDiaCalendario
+        ? calculateDiasCalendarioInclusivos(fechaInicio, fechaFin)
+        : calculateDiasPeriodo24Horas(fechaInicio, fechaFin);
+
+    return {
+        diasCobrados,
+        valorTotal: diasCobrados * valorDia,
+        tipoCalculoRenta: cobroDiaCalendario ? TIPO_CALCULO_DIA_CALENDARIO : TIPO_CALCULO_PERIODO_24_HORAS,
+    };
+};
+
 const formatCurrentBogotaDateLong = () => {
     const parts = new Intl.DateTimeFormat("es-CO", {
         timeZone: "America/Bogota",
@@ -549,10 +581,11 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                 horaEntrega,
                 fechaDevolucion,
                 horaDevolucion,
-                valorDia
+                valorDia,
+                cobroDiaCalendario: cobroDiaCalendarioBody
             } = req.body;
 
-            // Calcular días y total - Convertir los strings "YYYY-MM-DD" en Date (a medianoche local)
+            // Calcular días y total - Convertir los strings "YYYY-MM-DD" en Date (a medianoche UTC)
             const fechaInicio = parseDateOnly(fechaEntrega);
             const fechaFin = parseDateOnly(fechaDevolucion);
             if (!fechaInicio || !fechaFin) {
@@ -563,8 +596,19 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                 return res.status(400).json({ error: "La fecha de devolución no puede ser anterior a la de entrega" });
             }
 
-            const numeroDias = Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24));
-            const valorTotal = numeroDias * valorDia;
+            const valorDiaNumerico = Number(valorDia);
+            if (!Number.isFinite(valorDiaNumerico) || valorDiaNumerico < 0) {
+                return res.status(400).json({ error: "El valor del día debe ser un número válido" });
+            }
+
+            const cobroDiaCalendario = normalizeBoolean(cobroDiaCalendarioBody);
+            const { diasCobrados, valorTotal, tipoCalculoRenta } = calculateRentalTotals({
+                fechaInicio,
+                fechaFin,
+                valorDia: valorDiaNumerico,
+                cobroDiaCalendario,
+            });
+            const numeroDias = diasCobrados;
 
             // Crear la renta en la DB
             const nuevaRenta = await prisma.renta.create({
@@ -576,8 +620,11 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                     fechaDevolucion: fechaFin,
                     horaDevolucion,
                     numeroDias,
-                    valorDia,
+                    diasCobrados,
+                    valorDia: valorDiaNumerico,
                     valorTotal,
+                    cobroDiaCalendario,
+                    tipoCalculoRenta,
                 },
                 include: {
                     cliente: true,

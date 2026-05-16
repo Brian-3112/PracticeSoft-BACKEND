@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -21,10 +20,10 @@ model User {
 model Vehiculo {
   id             Int      @id @default(autoincrement())
   nombreVehiculo String
-  placa          String   @unique  
+  placa          String   @unique
   transito       String
-  fechaSOAT      DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
-  fechaTecno     DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
+  fechaSOAT      DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
+  fechaTecno     DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
   description    String
 
   // Relación inversa hacia Renta
@@ -33,18 +32,18 @@ model Vehiculo {
 
 // Tabla Cliente
 model Cliente {
-  id                 Int    @id @default(autoincrement())
-  nombre             String
-  identificacion     String @unique
-  direccion          String
-  celular            String
-  correo             String
-  nombreFamiliar     String
-  direccionFamiliar  String
-  telefonoFamiliar   String
-  nombrePersonal     String
-  direccionPersonal  String
-  telefonoPersonal   String
+  id                Int    @id @default(autoincrement())
+  nombre            String
+  identificacion    String @unique
+  direccion         String
+  celular           String
+  correo            String
+  nombreFamiliar    String
+  direccionFamiliar String
+  telefonoFamiliar  String
+  nombrePersonal    String
+  direccionPersonal String
+  telefonoPersonal  String
 
   // Relación inversa hacia Renta
   rentas Renta[]
@@ -52,21 +51,25 @@ model Cliente {
 
 // Tabla Renta
 model Renta {
-  id              Int       @id @default(autoincrement())
-  vehiculoId      Int
-  clienteId       Int
-  fechaEntrega    DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
-  horaEntrega     String
-  fechaDevolucion DateTime @db.Date   // Solo guarda fecha (YYYY-MM-DD)
-  horaDevolucion  String
-  numeroDias      Int
-  valorDia        Float
-  valorTotal      Float
-  createdAt       DateTime  @default(now())
+  id                 Int      @id @default(autoincrement())
+  vehiculoId         Int
+  clienteId          Int
+  fechaEntrega       DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
+  horaEntrega        String
+  fechaDevolucion    DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
+  horaDevolucion     String
+  numeroDias         Int
+  diasCobrados       Int      @default(0)
+  valorDia           Float
+  valorTotal         Float
+  cobroDiaCalendario Boolean  @default(false)
+  tipoCalculoRenta   String   @default("periodo_24_horas")
+  createdAt          DateTime @default(now())
 
-  vehiculo   Vehiculo @relation(fields: [vehiculoId], references: [id])
-  cliente    Cliente  @relation(fields: [clienteId], references: [id])
+  vehiculo Vehiculo @relation(fields: [vehiculoId], references: [id])
+  cliente  Cliente  @relation(fields: [clienteId], references: [id])
 }
+
 // Tabla Documentacion
 model Documentacion {
   id              Int      @id @default(autoincrement())
