@@ -2,18 +2,80 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require("@prisma/client");
 
-
 const prisma = new PrismaClient();
+
+const TEMPORARY_ALLOWED_MODULES = ["disponibilidad", "clientes", "vehiculos", "rentas"];
+const ADMIN_ALLOWED_MODULES = [
+  "disponibilidad",
+  "dashboard",
+  "clientes",
+  "vehiculos",
+  "rentas",
+  "documentacion",
+  "configuracion",
+];
+
+const normalizeAllowedModules = (allowedModules) => {
+  if (!Array.isArray(allowedModules) || allowedModules.length === 0) {
+    return TEMPORARY_ALLOWED_MODULES;
+  }
+
+  const uniqueModules = [...new Set(allowedModules.map((moduleName) => String(moduleName).trim()))];
+  return uniqueModules.filter((moduleName) => TEMPORARY_ALLOWED_MODULES.includes(moduleName));
+};
+
+const getAllowedModulesForUser = (user) => {
+  if (user.role === "admin") return ADMIN_ALLOWED_MODULES;
+  if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules;
+  return TEMPORARY_ALLOWED_MODULES;
+};
+
+const formatUserResponse = (user) => ({
+  id: user.id,
+  nombre: user.nombre,
+  apellido: user.apellido,
+  correo: user.email,
+  email: user.email,
+  role: user.role || "admin",
+  isTemporary: Boolean(user.isTemporary),
+  isActive: user.isActive !== false,
+  allowedModules: getAllowedModulesForUser(user),
+  expiresAt: user.expiresAt,
+  createdById: user.createdById,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
+
+const buildTokenPayload = (user) => ({
+  id: user.id,
+  email: user.email,
+  role: user.role || "admin",
+  isTemporary: Boolean(user.isTemporary),
+  allowedModules: getAllowedModulesForUser(user),
+});
 
 //LOGEAR
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = req.body.email || req.body.correo;
+    const { password } = req.body;
+
+    if (!email || typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ message: "Correo y contraseña son requeridos" });
+    }
 
     // Verifica si el usuario existe
     const user = await prisma.User.findUnique({ where: { email } });
     if (!user) {
       return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({ message: "Usuario desactivado" });
+    }
+
+    if (user.isTemporary && user.expiresAt && new Date(user.expiresAt) <= new Date()) {
+      return res.status(403).json({ message: "Usuario temporal expirado" });
     }
 
     // Compara la contraseña
@@ -22,53 +84,68 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "contraseña o correo invalido" });
     }
 
+    const usuario = formatUserResponse(user);
+
     // Genera un token JWT
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(buildTokenPayload(user), process.env.JWT_SECRET, { expiresIn: "1h" });
     //Envia el token mas los datos al front
-    res.json({
+    return res.json({
       message: "Ingreso exitoso",
       token,
-      id: user.id,
-      nombre: user.nombre,
-      apellido: user.apellido,
-      email: user.email
+      usuario,
+      id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      email: usuario.email,
+      correo: usuario.correo,
+      role: usuario.role,
+      isTemporary: usuario.isTemporary,
+      allowedModules: usuario.allowedModules,
     });
 
   } catch (error) {
-    res.status(500).json({ error: "Error al ingresar" });
+    console.error("Error al ingresar:", error);
+    return res.status(500).json({ error: "Error al ingresar" });
   }
 };
 
 //getttt
 const consulta = async (req, res) => {
   try {
+    const userId = req.usuario?.id || req.user?.id;
     const user = await prisma.User.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true,
-        nombre: true,
-        apellido: true,
-        email: true
-      }
+      where: { id: userId },
     });
 
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
-    res.json(user);
+    return res.json(formatUserResponse(user));
 
   } catch (error) {
     console.error('Error en consulta:', error);
-    res.status(500).json({ error: "Error obteniendo perfil del usuario" });
+    return res.status(500).json({ error: "Error obteniendo perfil del usuario" });
   }
 };
 
-
-//crear user
+//crear user admin
 const registerUser = async (req, res) => {
   try {
-    const { nombre, apellido, email, password } = req.body;
+    const { nombre, apellido, password } = req.body;
+    const email = req.body.email || req.body.correo;
+
+    if (req.usuario && req.usuario.role !== "admin") {
+      return res.status(403).json({ message: "No tienes permisos para realizar esta acción" });
+    }
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ message: "El correo es requerido" });
+    }
+
+    if (typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({ message: "La contraseña debe tener mínimo 6 caracteres" });
+    }
 
     // Verifica si el usuario ya existe
     const existingUser = await prisma.User.findUnique({ where: { email } });
@@ -81,12 +158,22 @@ const registerUser = async (req, res) => {
 
     // Crea el usuario
     const user = await prisma.User.create({
-      data: { nombre, apellido, email, password: hashedPassword },
+      data: {
+        nombre,
+        apellido,
+        email,
+        password: hashedPassword,
+        role: "admin",
+        isTemporary: false,
+        isActive: true,
+        allowedModules: ADMIN_ALLOWED_MODULES,
+      },
     });
 
-    res.status(201).json({ message: "Usuario creado", user });
+    return res.status(201).json({ message: "Usuario creado", usuario: formatUserResponse(user) });
   } catch (error) {
-    res.status(500).json({ error: "Error creando usuario" });
+    console.error("Error creando usuario:", error);
+    return res.status(500).json({ error: "Error creando usuario" });
   }
 };
 
@@ -109,7 +196,7 @@ const cambiarPassword = async (req, res) => {
     }
 
     const user = await prisma.User.findUnique({
-      where: { id: req.user.id },
+      where: { id: req.usuario?.id || req.user.id },
     });
 
     if (!user) {
@@ -135,4 +222,180 @@ const cambiarPassword = async (req, res) => {
   }
 };
 
-module.exports = { loginUser, consulta, registerUser, cambiarPassword };
+const createTemporaryUser = async (req, res) => {
+  try {
+    const { nombre, apellido, password, expiresAt } = req.body;
+    const email = req.body.email || req.body.correo;
+
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ message: "El correo es requerido" });
+    }
+
+    if (typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({ message: "La contraseña debe tener mínimo 6 caracteres" });
+    }
+
+    if (req.body.allowedModules !== undefined && !Array.isArray(req.body.allowedModules)) {
+      return res.status(400).json({ message: "allowedModules debe ser una lista" });
+    }
+
+    const requestedModules = Array.isArray(req.body.allowedModules) ? req.body.allowedModules : null;
+    const hasUnauthorizedModules = requestedModules?.some(
+      (moduleName) => !TEMPORARY_ALLOWED_MODULES.includes(String(moduleName).trim())
+    );
+    if (hasUnauthorizedModules) {
+      return res.status(400).json({ message: "El usuario temporal contiene módulos no autorizados" });
+    }
+    const allowedModules = normalizeAllowedModules(req.body.allowedModules);
+
+    const existingUser = await prisma.User.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ message: "Usuario ya existe" });
+    }
+
+    const expiresAtDate = expiresAt ? new Date(expiresAt) : null;
+    if (expiresAt && Number.isNaN(expiresAtDate.getTime())) {
+      return res.status(400).json({ message: "La fecha de expiración no es válida" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.User.create({
+      data: {
+        nombre,
+        apellido,
+        email,
+        password: hashedPassword,
+        role: "temporal",
+        isTemporary: true,
+        isActive: true,
+        allowedModules,
+        createdById: req.usuario.id,
+        expiresAt: expiresAtDate,
+      },
+    });
+
+    return res.status(201).json({
+      message: "Usuario temporal creado correctamente",
+      usuario: formatUserResponse(user),
+    });
+  } catch (error) {
+    console.error("Error creando usuario temporal:", error);
+    return res.status(500).json({ error: "Error creando usuario temporal" });
+  }
+};
+
+const listTemporaryUsers = async (_req, res) => {
+  try {
+    const users = await prisma.User.findMany({
+      where: { role: "temporal" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.status(200).json(users.map(formatUserResponse));
+  } catch (error) {
+    console.error("Error listando usuarios temporales:", error);
+    return res.status(500).json({ error: "Error listando usuarios temporales" });
+  }
+};
+
+const changeTemporaryUserPassword = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { newPassword } = req.body;
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID de usuario inválido" });
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < 6) {
+      return res.status(400).json({ message: "La nueva contraseña debe tener mínimo 6 caracteres" });
+    }
+
+    const user = await prisma.User.findUnique({ where: { id } });
+    if (!user || user.role !== "temporal") {
+      return res.status(404).json({ message: "Usuario temporal no encontrado" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.User.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    return res.status(200).json({ message: "Contraseña del usuario temporal actualizada correctamente" });
+  } catch (error) {
+    console.error("Error cambiando contraseña temporal:", error);
+    return res.status(500).json({ error: "Error cambiando contraseña del usuario temporal" });
+  }
+};
+
+const updateTemporaryUserStatus = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { isActive } = req.body;
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID de usuario inválido" });
+    }
+
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({ message: "El estado isActive debe ser booleano" });
+    }
+
+    const user = await prisma.User.findUnique({ where: { id } });
+    if (!user || user.role !== "temporal") {
+      return res.status(404).json({ message: "Usuario temporal no encontrado" });
+    }
+
+    const updatedUser = await prisma.User.update({
+      where: { id },
+      data: { isActive },
+    });
+
+    return res.status(200).json({
+      message: "Estado del usuario temporal actualizado correctamente",
+      usuario: {
+        id: updatedUser.id,
+        isActive: updatedUser.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("Error actualizando estado temporal:", error);
+    return res.status(500).json({ error: "Error actualizando estado del usuario temporal" });
+  }
+};
+
+const deleteTemporaryUser = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID de usuario inválido" });
+    }
+
+    const user = await prisma.User.findUnique({ where: { id } });
+    if (!user || user.role !== "temporal") {
+      return res.status(404).json({ message: "Usuario temporal no encontrado" });
+    }
+
+    await prisma.User.delete({ where: { id } });
+    return res.status(200).json({ message: "Usuario temporal eliminado correctamente", id });
+  } catch (error) {
+    console.error("Error eliminando usuario temporal:", error);
+    return res.status(500).json({ error: "Error eliminando usuario temporal" });
+  }
+};
+
+module.exports = {
+  loginUser,
+  consulta,
+  registerUser,
+  cambiarPassword,
+  createTemporaryUser,
+  listTemporaryUsers,
+  changeTemporaryUserPassword,
+  updateTemporaryUserStatus,
+  deleteTemporaryUser,
+  ADMIN_ALLOWED_MODULES,
+  TEMPORARY_ALLOWED_MODULES,
+};

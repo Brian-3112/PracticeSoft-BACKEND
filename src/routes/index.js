@@ -5,6 +5,7 @@ const routerVehiculo = require('./vehiculoRouter');
 const routerCliente =  require('./clienteRouter'); 
 const routerRenta = require('./rentaRouter');
 const routerDocumentacion = require('./documentacionRouter');
+const routerDashboard = require('./dashboardRouter');
 
 
 
@@ -19,6 +20,7 @@ function routerApi(app){
     router.use('/clientes', routerCliente);
     router.use('/rentas', routerRenta);
     router.use('/documentacion', routerDocumentacion);
+    router.use('/dashboard', routerDashboard);
 
     
     

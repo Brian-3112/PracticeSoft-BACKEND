@@ -1,20 +1,34 @@
 const express = require('express');
-const { loginUser, registerUser, consulta, cambiarPassword } = require('../controllers/usuarioController');
-const { authenticateToken } = require('../middleware');
+const {
+  loginUser,
+  registerUser,
+  consulta,
+  cambiarPassword,
+  createTemporaryUser,
+  listTemporaryUsers,
+  changeTemporaryUserPassword,
+  updateTemporaryUserStatus,
+  deleteTemporaryUser,
+} = require('../controllers/usuarioController');
+const { authenticateToken, requireRole } = require('../middleware');
 
 const router = express.Router();
 
-
 //iniciar sesion, autenticar user
 router.post("/login", loginUser);
-//get
+//get usuario autenticado
 router.get("/", authenticateToken, consulta);
 //cambiar password usuario autenticado
 router.put("/cambiar-password", authenticateToken, cambiarPassword);
-//inser one
-router.post("/", registerUser);
 
+// administración de usuarios temporales (solo admin)
+router.post("/temporales", authenticateToken, requireRole("admin"), createTemporaryUser);
+router.get("/temporales", authenticateToken, requireRole("admin"), listTemporaryUsers);
+router.patch("/temporales/:id/password", authenticateToken, requireRole("admin"), changeTemporaryUserPassword);
+router.patch("/temporales/:id/status", authenticateToken, requireRole("admin"), updateTemporaryUserStatus);
+router.delete("/temporales/:id", authenticateToken, requireRole("admin"), deleteTemporaryUser);
 
-
+//crear usuario administrador (solo admin)
+router.post("/", authenticateToken, requireRole("admin"), registerUser);
 
 module.exports = router;

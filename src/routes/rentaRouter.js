@@ -1,8 +1,10 @@
 const express = require('express');
 const { consultar, registerRenta, generarComprobante, descargarContratoDocx, descargarContratoVacioDocx, descargarContratoResponsabilidadDocx, deleteRenta } = require('../controllers/rentaController');
+const { authenticateToken, requireModuleAccess } = require('../middleware');
 
 const router = express.Router();
 
+router.use(authenticateToken, requireModuleAccess("rentas"));
 
 //get
 router.get("/", consultar);
@@ -18,7 +20,5 @@ router.get("/:id/contrato-vacio.docx", descargarContratoVacioDocx);
 router.get("/:id/contrato-responsabilidad.docx", descargarContratoResponsabilidadDocx);
 // Eliminar renta
 router.delete("/:id", deleteRenta);
-
-
 
 module.exports = router;

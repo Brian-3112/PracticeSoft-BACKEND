@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware');
+const { authenticateToken, requireRole } = require('../middleware');
 const {
     consultarDocumentacion,
     crearDocumentacion,
@@ -9,9 +9,11 @@ const {
 
 const router = express.Router();
 
-router.get('/', authenticateToken, consultarDocumentacion);
-router.post('/', authenticateToken, crearDocumentacion);
-router.get('/:id/archivo', authenticateToken, descargarArchivoDocumentacion);
-router.delete('/:id', authenticateToken, eliminarDocumentacion);
+router.use(authenticateToken, requireRole("admin"));
+
+router.get('/', consultarDocumentacion);
+router.post('/', crearDocumentacion);
+router.get('/:id/archivo', descargarArchivoDocumentacion);
+router.delete('/:id', eliminarDocumentacion);
 
 module.exports = router;
