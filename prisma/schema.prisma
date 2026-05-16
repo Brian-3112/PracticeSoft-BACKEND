@@ -59,17 +59,20 @@ model Cliente {
 
 // Tabla Renta
 model Renta {
-  id              Int      @id @default(autoincrement())
-  vehiculoId      Int
-  clienteId       Int
-  fechaEntrega    DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
-  horaEntrega     String
-  fechaDevolucion DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
-  horaDevolucion  String
-  numeroDias      Int
-  valorDia        Float
-  valorTotal      Float
-  createdAt       DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  vehiculoId         Int
+  clienteId          Int
+  fechaEntrega       DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
+  horaEntrega        String
+  fechaDevolucion    DateTime @db.Date // Solo guarda fecha (YYYY-MM-DD)
+  horaDevolucion     String
+  numeroDias         Int
+  valorDia           Float
+  valorTotal         Float
+  diasCobrados       Int?
+  tipoCalculoRenta   String?
+  cobroDiaCalendario Boolean?
+  createdAt          DateTime @default(now())
 
   vehiculo Vehiculo @relation(fields: [vehiculoId], references: [id])
   cliente  Cliente  @relation(fields: [clienteId], references: [id])

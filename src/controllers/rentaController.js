@@ -552,7 +552,9 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                 horaDevolucion,
                 valorDia,
                 valorTotal,
-                diasCobrados
+                diasCobrados,
+                tipoCalculoRenta,
+                cobroDiaCalendario
             } = req.body;
 
             // Calcular días tradicionales solo como respaldo para numeroDias cuando el frontend no envíe diasCobrados.
@@ -582,6 +584,16 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                 ? diasCobradosNumerico
                 : numeroDiasCalculadoAnterior;
 
+            const tipoCalculoRentaNormalizado =
+                typeof tipoCalculoRenta === "string" && tipoCalculoRenta.trim()
+                    ? tipoCalculoRenta.trim()
+                    : null;
+
+            const cobroDiaCalendarioNormalizado =
+                typeof cobroDiaCalendario === "boolean"
+                    ? cobroDiaCalendario
+                    : (typeof tipoCalculoRenta === "string" ? tipoCalculoRenta.trim().toLowerCase() === "calendario" : null);
+
             // Crear la renta en la DB
             const nuevaRenta = await prisma.renta.create({
                 data: {
@@ -594,6 +606,9 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                     numeroDias,
                     valorDia: valorDiaNumerico,
                     valorTotal: valorTotalNumerico,
+                    diasCobrados: Number.isFinite(diasCobradosNumerico) ? diasCobradosNumerico : null,
+                    tipoCalculoRenta: tipoCalculoRentaNormalizado,
+                    cobroDiaCalendario: cobroDiaCalendarioNormalizado,
                 },
                 include: {
                     cliente: true,
