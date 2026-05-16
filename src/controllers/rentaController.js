@@ -59,37 +59,6 @@ const formatDateDMY = (value) => {
     return `${day}-${month}-${year}`;
 };
 
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const TIPO_CALCULO_PERIODO_24_HORAS = "periodo_24_horas";
-const TIPO_CALCULO_DIA_CALENDARIO = "dia_calendario";
-
-const normalizeBoolean = (value) => {
-    if (typeof value === "boolean") return value;
-    if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        return ["true", "1", "si", "sí", "yes"].includes(normalized);
-    }
-    if (typeof value === "number") return value === 1;
-    return false;
-};
-
-const calculateDiasPeriodo24Horas = (fechaInicio, fechaFin) =>
-    Math.ceil((fechaFin - fechaInicio) / MS_PER_DAY);
-
-const calculateDiasCalendarioInclusivos = (fechaInicio, fechaFin) =>
-    Math.floor((fechaFin - fechaInicio) / MS_PER_DAY) + 1;
-
-const calculateRentalTotals = ({ fechaInicio, fechaFin, valorDia, cobroDiaCalendario }) => {
-    const diasCobrados = cobroDiaCalendario
-        ? calculateDiasCalendarioInclusivos(fechaInicio, fechaFin)
-        : calculateDiasPeriodo24Horas(fechaInicio, fechaFin);
-
-    return {
-        diasCobrados,
-        valorTotal: diasCobrados * valorDia,
-        tipoCalculoRenta: cobroDiaCalendario ? TIPO_CALCULO_DIA_CALENDARIO : TIPO_CALCULO_PERIODO_24_HORAS,
-    };
-};
 
 const formatCurrentBogotaDateLong = () => {
     const parts = new Intl.DateTimeFormat("es-CO", {
@@ -582,10 +551,11 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                 fechaDevolucion,
                 horaDevolucion,
                 valorDia,
-                cobroDiaCalendario: cobroDiaCalendarioBody
+                valorTotal,
+                diasCobrados
             } = req.body;
 
-            // Calcular días y total - Convertir los strings "YYYY-MM-DD" en Date (a medianoche UTC)
+            // Calcular días tradicionales solo como respaldo para numeroDias cuando el frontend no envíe diasCobrados.
             const fechaInicio = parseDateOnly(fechaEntrega);
             const fechaFin = parseDateOnly(fechaDevolucion);
             if (!fechaInicio || !fechaFin) {
@@ -601,30 +571,29 @@ const fillContratoTemplate = (templatePath, renta, options = {}) => {
                 return res.status(400).json({ error: "El valor del día debe ser un número válido" });
             }
 
-            const cobroDiaCalendario = normalizeBoolean(cobroDiaCalendarioBody);
-            const { diasCobrados, valorTotal, tipoCalculoRenta } = calculateRentalTotals({
-                fechaInicio,
-                fechaFin,
-                valorDia: valorDiaNumerico,
-                cobroDiaCalendario,
-            });
-            const numeroDias = diasCobrados;
+            const valorTotalNumerico = Number(valorTotal);
+            if (!Number.isFinite(valorTotalNumerico) || valorTotalNumerico < 0) {
+                return res.status(400).json({ error: "El valor total debe ser un número válido" });
+            }
+
+            const numeroDiasCalculadoAnterior = Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24));
+            const diasCobradosNumerico = Number(diasCobrados);
+            const numeroDias = Number.isFinite(diasCobradosNumerico)
+                ? diasCobradosNumerico
+                : numeroDiasCalculadoAnterior;
 
             // Crear la renta en la DB
             const nuevaRenta = await prisma.renta.create({
                 data: {
-                    vehiculoId: parseInt(vehiculoId),
-                    clienteId: parseInt(clienteId),
+                    vehiculoId: Number(vehiculoId),
+                    clienteId: Number(clienteId),
                     fechaEntrega: fechaInicio,
                     horaEntrega,
                     fechaDevolucion: fechaFin,
                     horaDevolucion,
                     numeroDias,
-                    diasCobrados,
                     valorDia: valorDiaNumerico,
-                    valorTotal,
-                    cobroDiaCalendario,
-                    tipoCalculoRenta,
+                    valorTotal: valorTotalNumerico,
                 },
                 include: {
                     cliente: true,
