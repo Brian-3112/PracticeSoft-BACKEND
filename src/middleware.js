@@ -14,9 +14,14 @@ const ADMIN_ALLOWED_MODULES = [
 ];
 const TEMPORARY_ALLOWED_MODULES = ["disponibilidad", "clientes", "vehiculos", "rentas"];
 
+const normalizeModules = (modules = []) => modules.map((m) => String(m).trim().toLowerCase());
+
+const resolveUserRole = (user) => user.role || (user.isTemporary ? "empleado" : "admin");
+
 const getAllowedModulesForUser = (user) => {
-  if (user.role === "admin") return ADMIN_ALLOWED_MODULES;
-  if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules;
+  const role = resolveUserRole(user);
+  if (role === "admin") return ADMIN_ALLOWED_MODULES;
+  if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return normalizeModules(user.allowedModules);
   return TEMPORARY_ALLOWED_MODULES;
 };
 
@@ -49,7 +54,7 @@ const authenticateToken = async (req, res, next) => {
       id: user.id,
       email: user.email,
       correo: user.email,
-      role: user.role || "admin",
+      role: resolveUserRole(user),
       isTemporary: Boolean(user.isTemporary),
       isActive: user.isActive !== false,
       allowedModules: getAllowedModulesForUser(user),
@@ -73,7 +78,7 @@ const requireRole = (role) => (req, res, next) => {
     return res.status(401).json({ message: "No autenticado" });
   }
 
-  if (user.role === role) {
+  if (resolveUserRole(user) === role) {
     return next();
   }
 
@@ -87,14 +92,16 @@ const requireModuleAccess = (moduleName) => (req, res, next) => {
     return res.status(401).json({ message: "No autenticado" });
   }
 
-  if (user.role === "admin") {
+  const role = resolveUserRole(user);
+  const allowedModules = normalizeModules(user.allowedModules || []);
+
+  if (role === "admin") {
     return next();
   }
 
   if (
-    user.role === "temporal" &&
-    Array.isArray(user.allowedModules) &&
-    user.allowedModules.includes(moduleName)
+    role === "empleado" &&
+    allowedModules.includes(String(moduleName).trim().toLowerCase())
   ) {
     return next();
   }
