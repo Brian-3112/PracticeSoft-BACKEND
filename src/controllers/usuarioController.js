@@ -10,9 +10,13 @@ const ALLOWED_ROLES = ["admin", "empleado"];
 
 const ADMIN_ALLOWED_MODULES = [...ALL_ALLOWED_MODULES];
 
-const normalizeAllowedModules = (allowedModules) => {
-  if (!Array.isArray(allowedModules) || allowedModules.length === 0) {
-    return DEFAULT_TEMPORARY_ALLOWED_MODULES;
+const normalizeAllowedModules = (allowedModules, { useDefaultIfMissing = true } = {}) => {
+  if (allowedModules === undefined || allowedModules === null) {
+    return useDefaultIfMissing ? DEFAULT_TEMPORARY_ALLOWED_MODULES : [];
+  }
+
+  if (!Array.isArray(allowedModules)) {
+    return useDefaultIfMissing ? DEFAULT_TEMPORARY_ALLOWED_MODULES : [];
   }
 
   const uniqueModules = [...new Set(allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase()))];
@@ -21,7 +25,7 @@ const normalizeAllowedModules = (allowedModules) => {
 
 const getAllowedModulesForUser = (user) => {
   if ((user.role || (user.isTemporary ? "empleado" : "admin")) === "admin") return ADMIN_ALLOWED_MODULES;
-  if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase());
+  if (Array.isArray(user.allowedModules)) return normalizeAllowedModules(user.allowedModules, { useDefaultIfMissing: false });
   return DEFAULT_TEMPORARY_ALLOWED_MODULES;
 };
 
@@ -245,14 +249,17 @@ const createTemporaryUser = async (req, res) => {
       return res.status(400).json({ message: "allowedModules debe ser una lista" });
     }
 
-    const requestedModules = Array.isArray(req.body.allowedModules) ? req.body.allowedModules : null;
-    const hasUnauthorizedModules = requestedModules?.some(
-      (moduleName) => !ALL_ALLOWED_MODULES.includes(String(moduleName).trim().toLowerCase())
-    );
-    if (hasUnauthorizedModules) {
+    const normalizedRequestedModules = normalizeAllowedModules(req.body.allowedModules, { useDefaultIfMissing: false });
+    const requestedModules = Array.isArray(req.body.allowedModules)
+      ? req.body.allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase())
+      : null;
+    if (requestedModules && requestedModules.length !== normalizedRequestedModules.length) {
       return res.status(400).json({ message: `Módulos no permitidos. Permitidos: ${ALL_ALLOWED_MODULES.join(", ")}` });
     }
-    const allowedModules = normalizeAllowedModules(req.body.allowedModules);
+
+    const allowedModules = req.body.allowedModules === undefined
+      ? DEFAULT_TEMPORARY_ALLOWED_MODULES
+      : normalizedRequestedModules;
 
     const existingUser = await prisma.User.findUnique({ where: { email } });
     if (existingUser) {
@@ -297,7 +304,19 @@ const listTemporaryUsers = async (_req, res) => {
       orderBy: { id: "desc" },
     });
 
-    return res.status(200).json(users.map(formatUserResponse));
+    return res.status(200).json(users.map((user) => {
+      const formatted = formatUserResponse(user);
+      return {
+        id: formatted.id,
+        nombre: formatted.nombre,
+        apellido: formatted.apellido,
+        correo: formatted.correo,
+        email: formatted.email,
+        isActive: formatted.isActive,
+        role: formatted.role,
+        allowedModules: formatted.allowedModules,
+      };
+    }));
   } catch (error) {
     console.error("Error listando usuarios temporales:", error);
     return res.status(500).json({ error: "Error listando usuarios temporales" });
