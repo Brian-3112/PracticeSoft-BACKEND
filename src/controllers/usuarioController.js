@@ -5,6 +5,8 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const TEMPORARY_ALLOWED_MODULES = ["disponibilidad", "clientes", "vehiculos", "rentas"];
+const ALLOWED_ROLES = ["admin", "empleado"];
+
 const ADMIN_ALLOWED_MODULES = [
   "disponibilidad",
   "dashboard",
@@ -20,13 +22,13 @@ const normalizeAllowedModules = (allowedModules) => {
     return TEMPORARY_ALLOWED_MODULES;
   }
 
-  const uniqueModules = [...new Set(allowedModules.map((moduleName) => String(moduleName).trim()))];
+  const uniqueModules = [...new Set(allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase()))];
   return uniqueModules.filter((moduleName) => TEMPORARY_ALLOWED_MODULES.includes(moduleName));
 };
 
 const getAllowedModulesForUser = (user) => {
-  if ((user.role || (user.isTemporary ? "temporal" : "admin")) === "admin") return ADMIN_ALLOWED_MODULES;
-  if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules;
+  if ((user.role || (user.isTemporary ? "empleado" : "admin")) === "admin") return ADMIN_ALLOWED_MODULES;
+  if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase());
   return TEMPORARY_ALLOWED_MODULES;
 };
 
@@ -36,7 +38,7 @@ const formatUserResponse = (user) => ({
   apellido: user.apellido,
   correo: user.email,
   email: user.email,
-  role: user.role || (user.isTemporary ? "temporal" : "admin"),
+  role: user.role || (user.isTemporary ? "empleado" : "admin"),
   isTemporary: Boolean(user.isTemporary),
   isActive: user.isActive !== false,
   allowedModules: getAllowedModulesForUser(user),
@@ -49,7 +51,7 @@ const formatUserResponse = (user) => ({
 const buildTokenPayload = (user) => ({
   id: user.id,
   email: user.email,
-  role: user.role || (user.isTemporary ? "temporal" : "admin"),
+  role: user.role || (user.isTemporary ? "empleado" : "admin"),
   isTemporary: Boolean(user.isTemporary),
   allowedModules: getAllowedModulesForUser(user),
 });
@@ -133,6 +135,7 @@ const consulta = async (req, res) => {
 const registerUser = async (req, res) => {
   try {
     const { nombre, apellido, password } = req.body;
+    const role = req.body.role ? String(req.body.role).trim().toLowerCase() : "admin";
     const email = req.body.email || req.body.correo;
 
     if (req.usuario && req.usuario.role !== "admin") {
@@ -143,26 +146,28 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "El correo es requerido" });
     }
 
+    if (!ALLOWED_ROLES.includes(role) || role !== "admin") {
+      return res.status(400).json({ message: "El role permitido para este endpoint es admin" });
+    }
+
     if (typeof password !== "string" || password.length < 6) {
       return res.status(400).json({ message: "La contraseña debe tener mínimo 6 caracteres" });
     }
 
-    // Verifica si el usuario ya existe
     const existingUser = await prisma.User.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: "Usuario ya existe" });
     }
 
-    // Hashea la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crea el usuario
     const user = await prisma.User.create({
       data: {
         nombre,
         apellido,
         email,
         password: hashedPassword,
+        role: "admin",
         isTemporary: false,
         isActive: true,
         allowedModules: ADMIN_ALLOWED_MODULES,
@@ -224,10 +229,19 @@ const cambiarPassword = async (req, res) => {
 const createTemporaryUser = async (req, res) => {
   try {
     const { nombre, apellido, password, expiresAt } = req.body;
+    const role = req.body.role ? String(req.body.role).trim().toLowerCase() : "empleado";
     const email = req.body.email || req.body.correo;
 
     if (!email || typeof email !== "string") {
       return res.status(400).json({ message: "El correo es requerido" });
+    }
+
+    if (typeof apellido !== "string" || !apellido.trim()) {
+      return res.status(400).json({ message: "El apellido es requerido" });
+    }
+
+    if (!ALLOWED_ROLES.includes(role) || role !== "empleado") {
+      return res.status(400).json({ message: "El role permitido para usuarios temporales es empleado" });
     }
 
     if (typeof password !== "string" || password.length < 6) {
@@ -240,7 +254,7 @@ const createTemporaryUser = async (req, res) => {
 
     const requestedModules = Array.isArray(req.body.allowedModules) ? req.body.allowedModules : null;
     const hasUnauthorizedModules = requestedModules?.some(
-      (moduleName) => !TEMPORARY_ALLOWED_MODULES.includes(String(moduleName).trim())
+      (moduleName) => !TEMPORARY_ALLOWED_MODULES.includes(String(moduleName).trim().toLowerCase())
     );
     if (hasUnauthorizedModules) {
       return res.status(400).json({ message: "El usuario temporal contiene módulos no autorizados" });
@@ -261,13 +275,14 @@ const createTemporaryUser = async (req, res) => {
     const user = await prisma.User.create({
       data: {
         nombre,
-        apellido,
+        apellido: apellido.trim(),
         email,
         password: hashedPassword,
+        role: "empleado",
         isTemporary: true,
         isActive: true,
         allowedModules,
-        createdById: req.usuario.id,
+        createdById: req.usuario?.id || null,
         expiresAt: expiresAtDate,
       },
     });
