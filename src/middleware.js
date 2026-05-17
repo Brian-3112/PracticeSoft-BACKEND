@@ -43,7 +43,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     if (user.isActive === false) {
-      return res.status(403).json({ message: "Acceso denegado\nUsuario deshabilitado" });
+      return res.status(403).json({ title: "Acceso denegado", message: "Usuario deshabilitado" });
     }
 
     if (user.isTemporary && user.expiresAt && new Date(user.expiresAt) <= new Date()) {
