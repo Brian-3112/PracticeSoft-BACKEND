@@ -4,32 +4,25 @@ const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
-const TEMPORARY_ALLOWED_MODULES = ["disponibilidad", "clientes", "vehiculos", "rentas"];
+const DEFAULT_TEMPORARY_ALLOWED_MODULES = ["disponibilidad", "clientes", "vehiculos", "rentas"];
+const ALL_ALLOWED_MODULES = ["disponibilidad", "dashboard", "clientes", "vehiculos", "rentas", "documentacion", "configuracion"];
 const ALLOWED_ROLES = ["admin", "empleado"];
 
-const ADMIN_ALLOWED_MODULES = [
-  "disponibilidad",
-  "dashboard",
-  "clientes",
-  "vehiculos",
-  "rentas",
-  "documentacion",
-  "configuracion",
-];
+const ADMIN_ALLOWED_MODULES = [...ALL_ALLOWED_MODULES];
 
 const normalizeAllowedModules = (allowedModules) => {
   if (!Array.isArray(allowedModules) || allowedModules.length === 0) {
-    return TEMPORARY_ALLOWED_MODULES;
+    return DEFAULT_TEMPORARY_ALLOWED_MODULES;
   }
 
   const uniqueModules = [...new Set(allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase()))];
-  return uniqueModules.filter((moduleName) => TEMPORARY_ALLOWED_MODULES.includes(moduleName));
+  return uniqueModules.filter((moduleName) => ALL_ALLOWED_MODULES.includes(moduleName));
 };
 
 const getAllowedModulesForUser = (user) => {
   if ((user.role || (user.isTemporary ? "empleado" : "admin")) === "admin") return ADMIN_ALLOWED_MODULES;
   if (Array.isArray(user.allowedModules) && user.allowedModules.length > 0) return user.allowedModules.map((moduleName) => String(moduleName).trim().toLowerCase());
-  return TEMPORARY_ALLOWED_MODULES;
+  return DEFAULT_TEMPORARY_ALLOWED_MODULES;
 };
 
 const formatUserResponse = (user) => ({
@@ -254,10 +247,10 @@ const createTemporaryUser = async (req, res) => {
 
     const requestedModules = Array.isArray(req.body.allowedModules) ? req.body.allowedModules : null;
     const hasUnauthorizedModules = requestedModules?.some(
-      (moduleName) => !TEMPORARY_ALLOWED_MODULES.includes(String(moduleName).trim().toLowerCase())
+      (moduleName) => !ALL_ALLOWED_MODULES.includes(String(moduleName).trim().toLowerCase())
     );
     if (hasUnauthorizedModules) {
-      return res.status(400).json({ message: "El usuario temporal contiene módulos no autorizados" });
+      return res.status(400).json({ message: `Módulos no permitidos. Permitidos: ${ALL_ALLOWED_MODULES.join(", ")}` });
     }
     const allowedModules = normalizeAllowedModules(req.body.allowedModules);
 
@@ -410,5 +403,6 @@ module.exports = {
   updateTemporaryUserStatus,
   deleteTemporaryUser,
   ADMIN_ALLOWED_MODULES,
-  TEMPORARY_ALLOWED_MODULES,
+  DEFAULT_TEMPORARY_ALLOWED_MODULES,
+  ALL_ALLOWED_MODULES,
 };
