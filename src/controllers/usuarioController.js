@@ -70,7 +70,7 @@ const loginUser = async (req, res) => {
     }
 
     if (user.isActive === false) {
-      return res.status(403).json({ message: "Usuario desactivado" });
+      return res.status(403).json({ message: "Usuario deshabilitado" });
     }
 
     if (user.isTemporary && user.expiresAt && new Date(user.expiresAt) <= new Date()) {
