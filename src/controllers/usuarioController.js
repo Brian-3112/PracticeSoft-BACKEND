@@ -102,6 +102,18 @@ const sendPasswordResetEmail = async ({ to, resetLink }) => {
   });
 };
 
+const getPasswordResetTokenDelegate = () => {
+  if (prisma.passwordResetToken) return prisma.passwordResetToken;
+
+  // Compatibilidad defensiva si el cliente Prisma no fue regenerado aún
+  const modelMap = prisma?._baseDmmf?.modelMap || {};
+  if (modelMap.PasswordResetToken) {
+    throw new Error("Prisma Client desactualizado: ejecuta 'npx prisma generate' y aplica migraciones");
+  }
+
+  throw new Error("Modelo PasswordResetToken no disponible en Prisma Client");
+};
+
 const loginUser = async (req, res) => {
   try {
     const email = req.body.email || req.body.correo;
@@ -469,11 +481,12 @@ const forgotPassword = async (req, res) => {
 
     const user = await prisma.User.findUnique({ where: { email } });
     if (user && user.isActive !== false) {
+      const passwordResetToken = getPasswordResetTokenDelegate();
       const rawToken = crypto.randomBytes(32).toString("hex");
       const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRATION_MINUTES * 60 * 1000);
 
-      await prisma.passwordResetToken.create({
+      await passwordResetToken.create({
         data: {
           tokenHash,
           userId: user.id,
@@ -495,6 +508,7 @@ const forgotPassword = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
+    const passwordResetToken = getPasswordResetTokenDelegate();
     const token = req.body.token || req.params.token;
     const password = req.body.password || req.body.nuevaPassword;
 
@@ -507,7 +521,7 @@ const resetPassword = async (req, res) => {
     }
 
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const passwordReset = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+    const passwordReset = await passwordResetToken.findUnique({ where: { tokenHash } });
 
     if (!passwordReset) {
       return res.status(400).json({ message: "Token inválido" });
@@ -528,11 +542,11 @@ const resetPassword = async (req, res) => {
         where: { id: passwordReset.userId },
         data: { password: hashedPassword },
       }),
-      prisma.passwordResetToken.update({
+      passwordResetToken.update({
         where: { id: passwordReset.id },
         data: { usedAt: new Date() },
       }),
-      prisma.passwordResetToken.updateMany({
+      passwordResetToken.updateMany({
         where: { userId: passwordReset.userId, usedAt: null },
         data: { usedAt: new Date() },
       }),
