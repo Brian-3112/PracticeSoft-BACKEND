@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
@@ -54,6 +56,52 @@ const buildTokenPayload = (user) => ({
 });
 
 //LOGEAR
+
+const PASSWORD_RESET_EXPIRATION_MINUTES = Number(process.env.PASSWORD_RESET_EXPIRATION_MINUTES || 30);
+const MIN_PASSWORD_LENGTH = 6;
+
+const getResetBaseUrl = (req) => {
+  const candidate = req.body.resetUrl || req.body.resetPasswordUrl || req.body.frontendResetUrl;
+  return typeof candidate === "string" && candidate.trim() ? candidate.trim() : null;
+};
+
+const buildResetLink = (baseUrl, token) => {
+  if (!baseUrl) return null;
+  return baseUrl.includes("?") ? `${baseUrl}&token=${token}` : `${baseUrl.replace(/\/$/, "")}/${token}`;
+};
+
+const buildResetResponseMessage = { message: "Si el correo existe, se enviaron instrucciones" };
+
+const getMailTransport = () => {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) return null;
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+};
+
+const sendPasswordResetEmail = async ({ to, resetLink }) => {
+  const transporter = getMailTransport();
+  if (!transporter || !resetLink) return;
+
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  await transporter.sendMail({
+    from,
+    to,
+    subject: "Recuperación de contraseña",
+    text: `Recibimos una solicitud para restablecer tu contraseña. Usa este enlace: ${resetLink}`,
+    html: `<p>Recibimos una solicitud para restablecer tu contraseña.</p><p><a href="${resetLink}">Restablecer contraseña</a></p>`,
+  });
+};
+
 const loginUser = async (req, res) => {
   try {
     const email = req.body.email || req.body.correo;
@@ -411,6 +459,92 @@ const deleteTemporaryUser = async (req, res) => {
   }
 };
 
+
+const forgotPassword = async (req, res) => {
+  try {
+    const email = req.body.email || req.body.correo;
+    if (!email || typeof email !== "string") {
+      return res.status(200).json(buildResetResponseMessage);
+    }
+
+    const user = await prisma.User.findUnique({ where: { email } });
+    if (user && user.isActive !== false) {
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRATION_MINUTES * 60 * 1000);
+
+      await prisma.passwordResetToken.create({
+        data: {
+          tokenHash,
+          userId: user.id,
+          expiresAt,
+        },
+      });
+
+      const resetBaseUrl = getResetBaseUrl(req);
+      const resetLink = buildResetLink(resetBaseUrl, rawToken);
+      await sendPasswordResetEmail({ to: user.email, resetLink });
+    }
+
+    return res.status(200).json(buildResetResponseMessage);
+  } catch (error) {
+    console.error("Error en forgot password:", error);
+    return res.status(200).json(buildResetResponseMessage);
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const token = req.body.token || req.params.token;
+    const password = req.body.password || req.body.nuevaPassword;
+
+    if (typeof token !== "string" || !token.trim()) {
+      return res.status(400).json({ message: "Token requerido" });
+    }
+
+    if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: `La contraseña debe tener mínimo ${MIN_PASSWORD_LENGTH} caracteres` });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const passwordReset = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+
+    if (!passwordReset) {
+      return res.status(400).json({ message: "Token inválido" });
+    }
+
+    if (passwordReset.usedAt) {
+      return res.status(400).json({ message: "Token ya utilizado" });
+    }
+
+    if (new Date(passwordReset.expiresAt) <= new Date()) {
+      return res.status(401).json({ message: "Token expirado" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.$transaction([
+      prisma.User.update({
+        where: { id: passwordReset.userId },
+        data: { password: hashedPassword },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: passwordReset.id },
+        data: { usedAt: new Date() },
+      }),
+      prisma.passwordResetToken.updateMany({
+        where: { userId: passwordReset.userId, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return res.status(200).json({ message: "Contraseña actualizada" });
+  } catch (error) {
+    console.error("Error restableciendo contraseña:", error);
+    return res.status(500).json({ message: "Error actualizando contraseña" });
+  }
+};
+
 module.exports = {
   loginUser,
   consulta,
@@ -421,6 +555,8 @@ module.exports = {
   changeTemporaryUserPassword,
   updateTemporaryUserStatus,
   deleteTemporaryUser,
+  forgotPassword,
+  resetPassword,
   ADMIN_ALLOWED_MODULES,
   DEFAULT_TEMPORARY_ALLOWED_MODULES,
   ALL_ALLOWED_MODULES,

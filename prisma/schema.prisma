@@ -22,6 +22,21 @@ model User {
   expiresAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  passwordResets PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id         Int      @id @default(autoincrement())
+  tokenHash  String   @unique
+  userId     Int
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // Tabla Vehiculo
