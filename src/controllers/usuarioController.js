@@ -103,15 +103,11 @@ const sendPasswordResetEmail = async ({ to, resetLink }) => {
 };
 
 const getPasswordResetTokenDelegate = () => {
+  // Delegate normal esperado por Prisma para model PasswordResetToken
   if (prisma.passwordResetToken) return prisma.passwordResetToken;
-
-  // Compatibilidad defensiva si el cliente Prisma no fue regenerado aún
-  const modelMap = prisma?._baseDmmf?.modelMap || {};
-  if (modelMap.PasswordResetToken) {
-    throw new Error("Prisma Client desactualizado: ejecuta 'npx prisma generate' y aplica migraciones");
-  }
-
-  throw new Error("Modelo PasswordResetToken no disponible en Prisma Client");
+  // Fallback defensivo por variaciones no esperadas de naming en runtimes antiguos
+  if (prisma.passwordresettoken) return prisma.passwordresettoken;
+  return null;
 };
 
 const loginUser = async (req, res) => {
@@ -482,6 +478,10 @@ const forgotPassword = async (req, res) => {
     const user = await prisma.User.findUnique({ where: { email } });
     if (user && user.isActive !== false) {
       const passwordResetToken = getPasswordResetTokenDelegate();
+      if (!passwordResetToken) {
+        console.warn("PasswordResetToken no disponible en Prisma Client. Ejecuta: npx prisma migrate deploy && npx prisma generate");
+        return res.status(200).json(buildResetResponseMessage);
+      }
       const rawToken = crypto.randomBytes(32).toString("hex");
       const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
       const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRATION_MINUTES * 60 * 1000);
@@ -509,6 +509,9 @@ const forgotPassword = async (req, res) => {
 const resetPassword = async (req, res) => {
   try {
     const passwordResetToken = getPasswordResetTokenDelegate();
+    if (!passwordResetToken) {
+      return res.status(500).json({ message: "Configuración incompleta de recuperación de contraseña. Ejecuta migraciones y prisma generate." });
+    }
     const token = req.body.token || req.params.token;
     const password = req.body.password || req.body.nuevaPassword;
 
