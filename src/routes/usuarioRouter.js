@@ -9,6 +9,8 @@ const {
   changeTemporaryUserPassword,
   updateTemporaryUserStatus,
   deleteTemporaryUser,
+  forgotPassword,
+  resetPassword,
 } = require('../controllers/usuarioController');
 const { authenticateToken, requireRole } = require('../middleware');
 
@@ -20,6 +22,11 @@ router.post("/login", loginUser);
 router.get("/", authenticateToken, consulta);
 //cambiar password usuario autenticado
 router.put("/cambiar-password", authenticateToken, cambiarPassword);
+router.post("/forgot-password", forgotPassword);
+router.post("/olvide-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+router.post("/reset-password/:token", resetPassword);
+router.post("/nuevo-password/:token", resetPassword);
 
 // administración de usuarios temporales (solo admin)
 router.post("/temporales", authenticateToken, requireRole("admin"), createTemporaryUser);
